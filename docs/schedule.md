@@ -16,27 +16,86 @@ Solo, 9 real days. All times **PT** (the author's local timezone, so event times
 
 The effective window is **Sep 4 → Sep 13, 09:00**, which is nine days, not twelve. Everything below is planned backwards from check-in #1 rather than from the submission date, because the check-ins are the gates that can disqualify.
 
+## Where we actually are
+
+**Revised Sep 4, 23:00 PT.** The Arc leg ran about three days ahead of plan: D2, D3 and D4 all landed
+on the evening of D1. Contracts written and tested, deployed to Arc testnet, and the full
+take-profit lifecycle executed in six real transactions — see [`../arc/DEPLOYMENTS.md`](../arc/DEPLOYMENTS.md).
+
+| Original day | Scope | Status |
+|---|---|---|
+| D1 — Sep 4 | Repo, licensing split, probe as documented prior work, architecture, environment | **done** |
+| D2 — Sep 5 | v4 adapter productionised, access control, tests | **done Sep 4** — 35 tests green |
+| D3 — Sep 6 | Dynamic fee hook, CREATE2 mining, position registry, keeper skeleton | **hook done and deployed Sep 4**; keeper skeleton not started |
+| D4 — Sep 7 | Full lifecycle on Arc testnet with real transactions | **done Sep 4** — six verified txs, 0.081341 USDC all in |
+
+That banks roughly three days. The plan below spends them on the **Aqua leg**, not on polish.
+
 ## Plan
 
-**Arc leg first.** It carries two of the three prize submissions (Arc and Uniswap) and it is the leg with a hard external dependency — Arc mainnet on Sep 16 — so it needs to be finished and deployable, not merely demoable.
+The reordering rationale: the Arc leg is now the *known* one — it exists, it is deployed, and it
+works on a live chain. The Aqua leg is the unknown one. It is built on SwapVM, which we have only
+probed; it carries the 1inch submission on its own; and it is the leg with a copyleft licence
+boundary to get right. **Risk should be retired earliest, not last**, so the Aqua leg moves forward
+into the slack and the dashboard — well understood, low risk, and easy to compress — moves back.
+
+A useful side effect: the Sep 10 scope decision was "cut Aqua if it is behind." If Aqua is
+substantially done by Sep 7, that decision stops being a threat to a whole prize submission and
+becomes a much cheaper choice about how much dashboard to build.
 
 | Day | Focus | Done when |
 |---|---|---|
-| **D1 — Sep 4** *(evening only)* | Repo, licensing split, probe committed as documented prior work, architecture, schedule. Environment: Arc testnet reachable, Ethereum mainnet fork pinned. | Public repo live with a real initial commit |
-| **D2 — Sep 5** | Arc v4 adapter, productionised from the probe: pool creation, one-sided mint, burn, fee collection. Owner-only → proper access control. | Adapter compiles, unit tests pass against a mocked PoolManager |
-| **D3 — Sep 6** | Custom v4 hook (dynamic LP fee) deployed via CREATE2 mining. Position registry + keeper skeleton. | Hook live on Arc testnet, `slot0` reads back the expected `lpFee` |
-| **D4 — Sep 7** | Full lifecycle on Arc testnet with real transactions. **Check-in #1 before 20:59.** | Verified txs for open → cross → close, linked in the README |
-| **D5 — Sep 8** | Minimal multi-position dashboard + backend indexer reading v4 events (`Initialize` / `Swap` / `ModifyLiquidity`). | Dashboard shows live testnet positions |
-| **D6 — Sep 9** | Aqua leg starts: `Extruction` solvency guard against the official SwapVM contracts, on an Ethereum mainnet fork. | Guard caps a quote correctly in a Foundry test |
-| **D7 — Sep 10** | Aqua `IMakerHooks` settlement — redeem-on-fill, redeposit-on-receive, ERC-4626 wired. **Check-in #2 before 20:59.** | A fill on the fork redeems from the vault atomically |
-| **D8 — Sep 11** | Aqua demo path end to end on the fork; buffer ratio; whichever leg is behind gets the day. | Both legs demonstrable |
-| **D9 — Sep 12** | Freeze. Demo video, README final, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, Uniswap feedback form submitted, submission entered on the dashboard. | Submitted — **not** left for the morning of the 13th |
+| **D2 — Sep 5** | Aqua leg starts early. Pin the official Aqua/SwapVM contracts, stand up the mainnet fork, `Extruction` solvency guard capping quotes at `min(virtual, redeemable, allowance)`. | Guard caps a quote correctly in a Foundry test against official contracts |
+| **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | A fill on the fork redeems from the vault atomically |
+| **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | Both legs demonstrable |
+| **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | Keeper closes a testnet position unattended |
+| **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | Dashboard shows live testnet positions and the Aqua maker |
+| **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | Whatever is behind gets this day |
+| **D8 — Sep 11** | README, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, video script and rehearsal. | Everything written except the recording |
+| **D9 — Sep 12** | Record the demo video. Submit on the dashboard. | Submitted — **not** left for the morning of the 13th |
+
+Two full days of buffer at the end. For a solo run that is the right shape; the failure mode of a
+nine-day sprint is not running out of ideas, it is running out of Sunday.
+
+## What is blocked on the author, not on the build
+
+These cannot be done by tooling, and two of them are eligibility gates rather than deliverables.
+
+| When | What | Why it is blocking |
+|---|---|---|
+| **Sep 7, 20:59** | **Check-in #1** | Hard eligibility gate. Requires an ETHGlobal login. |
+| **Sep 10, 20:59** | **Check-in #2** | Same. |
+| Any time before Sep 12 | Project entry on the dashboard; confirm Uniswap is selectable for a Continuity project | The one execution confirmation left from the prize plan |
+| Any time before Sep 12 | Uniswap Developer Feedback Form, with the `FEEDBACK.md` link | Without it the Uniswap entry does not qualify |
+| Early | Discord questions to the Arc sponsor | Answers affect how the mainnet link is delivered after the 13th |
+| Sep 12 | Demo video, recorded with the author's own voice | Rules forbid AI voiceover, phone recording, and speed-ups |
+
+The check-ins are the single largest risk on this schedule now. Everything else can be recovered from;
+a missed check-in cannot.
 
 ## The scope decision at check-in #2 (Sep 10)
 
-If the Aqua leg is behind on D7, it gets **cut to minimum demonstrable scope** — one custom opcode plus a mainnet-fork demo — rather than allowed to eat the Arc leg's finishing time. This is decided on Sep 10, not negotiated on Sep 12.
+Originally this read: "if the Aqua leg is behind, cut it to one custom opcode plus a fork demo."
+Front-loading Aqua changes what is being decided, and for the better — by Sep 10 the Aqua leg
+should already be done rather than at risk, so the decision is no longer whether to abandon a whole
+prize submission.
 
-The Arc leg is never the thing that gets cut: it carries two prize submissions and the mainnet obligation.
+**What now gets decided on Sep 10, in this order:**
+
+1. **How much dashboard.** The honest floor is a page that lists positions and their state. Anything
+   past that is presentation, and presentation is what gets cut first.
+2. **Whether to attempt the custom SwapVM opcode variant.** 1inch explicitly permits redeploying a
+   modified SwapVM, and doing so is a differentiator rather than a requirement — the official
+   extension points (`Extruction`, `IMakerHooks`) already satisfy the brief. Attempt it only if D7
+   is genuinely free.
+3. **Only if Aqua has slipped badly:** the original cut still stands as the fallback.
+
+The Arc leg is never the thing that gets cut. It carries two of the three prize submissions and the
+mainnet obligation, and as of Sep 4 it is already deployed and verified — so cutting it would mean
+discarding finished work, which is never the right trade.
+
+Whatever is decided is decided **on Sep 10**, not renegotiated on the 12th. The point of naming a
+decision date is to stop the last two days from being spent deciding instead of finishing.
 
 ## After submission
 
