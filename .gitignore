@@ -1,0 +1,30 @@
+# Foundry
+out/
+cache/
+lib/
+broadcast/
+*.t.sol.snap
+
+# Node
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+keystore/
+
+# Local scratch
+temp/
+tmp/
+.DS_Store
