@@ -18,7 +18,7 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Event | ETHOnline 2026 (Sep 4 – Sep 16, 2026) |
 | Track | Continuity — hacking on an existing project |
 | Team | solo |
-| Arc leg | in progress |
+| Arc leg | v4 position manager + dynamic fee hook, 35 tests green |
 | Aqua leg | not started (scheduled D5–D8) |
 
 ---

@@ -71,13 +71,7 @@ abstract contract Base is Test {
     }
 
     function _poolKey(IHooks hooks, uint24 fee) internal view returns (PoolKey memory) {
-        return PoolKey({
-            currency0: currency0,
-            currency1: currency1,
-            fee: fee,
-            tickSpacing: TICK_SPACING,
-            hooks: hooks
-        });
+        return PoolKey({currency0: currency0, currency1: currency1, fee: fee, tickSpacing: TICK_SPACING, hooks: hooks});
     }
 
     /// @dev Initialize at tick 0, i.e. a 1:1 price. Keeps the arithmetic in the assertions legible.

@@ -201,8 +201,7 @@ contract BarkerV4Positions is IUnlockCallback {
             closed: false
         });
 
-        bytes memory result =
-            poolManager.unlock(abi.encode(ACTION_OPEN, abi.encode(positionId, msg.sender)));
+        bytes memory result = poolManager.unlock(abi.encode(ACTION_OPEN, abi.encode(positionId, msg.sender)));
         (uint256 amount0, uint256 amount1) = abi.decode(result, (uint256, uint256));
 
         // The pool's own accounting, not ours. If it debited the wrong side, the range was not

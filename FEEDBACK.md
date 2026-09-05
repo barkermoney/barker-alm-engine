@@ -44,9 +44,45 @@ Minting a one-sided range above spot took only `token0` and zero `token1`; a swa
 
 *(entries added as the Arc leg is built)*
 
-### Sep 4 — setup
+### Sep 4 — setup, position manager, dynamic fee hook
 
-- Repo scaffolded, probe committed as documented pre-existing work.
+Repo scaffolded, probe committed as documented pre-existing work. Then the first real build: a one-sided position manager over `PoolManager`, and a surge-fee hook. 35 tests, all green. Four new findings.
+
+#### 8. There is no way to read back what LP fee a swap actually paid
+
+This is the one we would most like fixed.
+
+A `beforeSwap` hook can override the LP fee by returning `fee | OVERRIDE_FEE_FLAG`. That override applies to the swap and is then **gone** — it is not written to `slot0`, not included in the `Swap` event, and not retrievable afterwards by any getter we could find. `slot0.lpFee` continues to report the value from the last `updateDynamicLPFee`, which for an override-driven hook is a number no swap ever actually paid.
+
+So there is no way for an integrator, an indexer, a block explorer, or a user to answer "what did that swap cost?" without the hook having had the foresight to emit its own event. We ended up emitting `FeeApplied` purely so our **own tests** could observe our own hook's behaviour — the assertion had nowhere else to read from.
+
+Concretely, the ask: **put the applied LP fee in the `Swap` event.** It already carries `fee`, but that is the pool's stored fee, not the override that was actually charged. Every dynamic-fee pool on v4 is currently unobservable from the outside, and every such hook is independently reinventing the same event to compensate. Analytics on dynamic-fee pools is not going to happen until this is fixed at the core.
+
+#### 9. Dynamic fees interact with exact-input accounting in a way the docs never state
+
+Worth writing down because it turned out to be the single most important number in our product, and we found it by having a test fail rather than by reading anything.
+
+For an exact-input swap the fee is deducted from the input before the price math runs, while the *whole* input still accrues to the liquidity. So a position whose range is fully crossed realises `geometricMean / (1 - fee)`, not `geometricMean`. At a 0.30% pool that is a premium of exactly `0.003 / 0.997 = 0.3009%`.
+
+For us that premium *is* the product: a one-sided range sells across its span at the geometric mean, which is strictly worse than a limit order resting at the top — and the fee premium is the entire reason to use a range anyway. We now assert it to four decimal places. A worked example of fee-versus-price interaction in the dynamic-fee docs would have saved us the detour, and would help anyone reasoning about whether a fee schedule is actually paying for itself.
+
+#### 10. Hook address mining has no home in `v4-core`
+
+Following on from finding 3. We deliberately built without `v4-periphery` (finding 4 — it works well), but `HookMiner` lives in periphery. So a project taking the no-periphery path has to hand-roll salt mining, which is exactly the piece a newcomer is least equipped to write and most dangerous to get subtly wrong.
+
+Suggestion: `HookMiner` is pure address arithmetic with no dependency on periphery's contracts. It belongs in `v4-core`, or in a standalone package, so that "no periphery" and "can deploy a hook" stop being in tension.
+
+We did add one thing that we would recommend to every hook author, and that we did not see in any example: **check your own address in the constructor.**
+
+```solidity
+if (uint160(address(this)) & Hooks.ALL_HOOK_MASK != REQUIRED_FLAGS) revert InvalidHookAddress();
+```
+
+Without it, a mis-mined salt produces a hook that compiles, deploys, verifies, and is then silently never called by the PoolManager — a pool that looks like it has a fee schedule and does not. That is a very expensive way to find out. This one-liner turns it into a failed deployment.
+
+#### 11. `StateLibrary` attaches to `IPoolManager`, not `PoolManager`
+
+Small, but it cost a compile cycle. `using StateLibrary for IPoolManager` does not apply to a variable typed as the concrete `PoolManager` — natural to do in tests, where you deploy the concrete contract. The error (`Member "getSlot0" not found`) does not hint that the fix is a cast to the interface. Attaching the library to both types, or a note in the library's docs, would remove the papercut.
 
 ---
 

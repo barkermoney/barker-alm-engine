@@ -148,7 +148,12 @@ contract BarkerDynamicFeeHook is IHooks {
         if (!obs.initialized) {
             observations[id] =
                 Observation({lastTick: currentTick, lastBlock: uint32(block.number), surge: 0, initialized: true});
-            return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, baseFee | LPFeeLibrary.OVERRIDE_FEE_FLAG);
+            return
+                (
+                    IHooks.beforeSwap.selector,
+                    BeforeSwapDeltaLibrary.ZERO_DELTA,
+                    baseFee | LPFeeLibrary.OVERRIDE_FEE_FLAG
+                );
         }
 
         uint24 surge = _decayed(obs.surge, uint32(block.number) - obs.lastBlock);
@@ -164,12 +169,8 @@ contract BarkerDynamicFeeHook is IHooks {
         // forge-lint: disable-next-line(unsafe-typecast)
         surge = uint24(total);
 
-        observations[id] = Observation({
-            lastTick: currentTick,
-            lastBlock: uint32(block.number),
-            surge: surge,
-            initialized: true
-        });
+        observations[id] =
+            Observation({lastTick: currentTick, lastBlock: uint32(block.number), surge: surge, initialized: true});
 
         uint24 fee = baseFee + surge;
         if (fee > maxFee) fee = maxFee;
@@ -265,11 +266,7 @@ contract BarkerDynamicFeeHook is IHooks {
         revert HookNotImplemented();
     }
 
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
-        external
-        pure
-        returns (bytes4)
-    {
+    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure returns (bytes4) {
         revert HookNotImplemented();
     }
 
