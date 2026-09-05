@@ -64,7 +64,7 @@ Do not move files across that directory boundary without re-checking which licen
 
 ## AI usage disclosure
 
-This project was built with AI assistance (Claude Code). Which files, which prompts, and which parts were human-written are disclosed in [`AI-DISCLOSURE.md`](AI-DISCLOSURE.md), with the working specs kept under [`docs/specs/`](docs/specs/).
+This project was built with AI assistance (Claude Code). [`AI-DISCLOSURE.md`](AI-DISCLOSURE.md) breaks that down per file, and states plainly that no spec-driven framework was used — the design documents under [`docs/`](docs/) are the written direction, and they are committed here.
 
 ---
 

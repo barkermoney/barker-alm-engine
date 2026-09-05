@@ -10,7 +10,7 @@ Solo, 9 real days. All times **PT** (the author's local timezone, so event times
 | **Sep 7, 20:59** | **Project check-in #1** | Eligibility gate, not optional |
 | **Sep 10, 20:59** | **Project check-in #2** | Eligibility gate + internal scope decision |
 | **Sep 13, 09:00** | **Submissions due** | 12:00 EDT. The real deadline — Sep 16 is only the finale. Late submissions are not accepted. |
-| Sep 14, 09:00 | Live judging (top ~20% only) | 7 minutes, live, English |
+| Sep 14, 09:00 | Live judging (top ~20% only) | 7 minutes: **4 minutes demo + 3 minutes Q&A**, live, English. Round 1 has no bearing on partner prizes — most prize money goes to projects that never advance. |
 | Sep 16, 09:00 | Finale | Arc mainnet goes live the same day |
 | Sep 30 | Arc mainnet deployment deadline | For the Arc "push to mainnet" bounty |
 
@@ -57,21 +57,37 @@ becomes a much cheaper choice about how much dashboard to build.
 Two full days of buffer at the end. For a solo run that is the right shape; the failure mode of a
 nine-day sprint is not running out of ideas, it is running out of Sunday.
 
-## What is blocked on the author, not on the build
+**One caveat on compressing the dashboard.** The official judging criteria are Technicality,
+Originality, Practicality, **Usability (UI/UX/DX)** and WOW Factor — five categories, so the
+interface is a fifth of the score, not a nice-to-have. D6 should produce something a judge can look
+at and understand in ten seconds, not a debug view. If anything gets cut on Sep 10 it should be
+breadth of features, not the legibility of the one screen that gets demoed.
 
-These cannot be done by tooling, and two of them are eligibility gates rather than deliverables.
+## What is blocked on the author, not on the build
 
 | When | What | Why it is blocking |
 |---|---|---|
-| **Sep 7, 20:59** | **Check-in #1** | Hard eligibility gate. Requires an ETHGlobal login. |
-| **Sep 10, 20:59** | **Check-in #2** | Same. |
-| Any time before Sep 12 | Project entry on the dashboard; confirm Uniswap is selectable for a Continuity project | The one execution confirmation left from the prize plan |
+| Sep 7 / Sep 10, 20:59 | Project check-ins | Progress touchpoints; the dashboard prompts when it is time. See the note below. |
+| Any time before Sep 12 | Confirm Uniswap is selectable for a Continuity project on the submission form | The last execution confirmation from the prize plan. The prize step unlocks after the earlier form steps are filled. |
 | Any time before Sep 12 | Uniswap Developer Feedback Form, with the `FEEDBACK.md` link | Without it the Uniswap entry does not qualify |
 | Early | Discord questions to the Arc sponsor | Answers affect how the mainnet link is delivered after the 13th |
-| Sep 12 | Demo video, recorded with the author's own voice | Rules forbid AI voiceover, phone recording, and speed-ups |
+| Sep 12 | Demo video, recorded with the author's own voice | Rules forbid AI voiceover, phone recording, speed-ups, and anything under 720p or over 4 minutes |
 
-The check-ins are the single largest risk on this schedule now. Everything else can be recovered from;
-a missed check-in cannot.
+### On the check-ins — corrected Sep 4
+
+An earlier version of this document called the check-ins hard eligibility gates that could not be
+recovered from. **That was our assumption, not the rules.** The official wording is:
+
+> "Check-ins are in place to help track your progress and for us to offer support. The check-in
+> process is simple: your Hacker Dashboard will notify you when it's time to check in […] Check-ins
+> allow you to highlight any blockers, ask for help, or simply confirm that everything is on track."
+
+Supportive, not punitive, and nothing anywhere ties them to disqualification. They are also *pull*
+rather than *push* — the dashboard notifies, so there is nothing to submit ahead of time, which is
+why no check-in action appears on it today. Do them when prompted; do not plan around them as if
+they were the submission deadline.
+
+The one genuinely unrecoverable deadline is **Sep 13, 12:00 EDT**. Late submissions are not accepted.
 
 ## The scope decision at check-in #2 (Sep 10)
 
