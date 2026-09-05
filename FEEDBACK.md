@@ -84,6 +84,41 @@ Without it, a mis-mined salt produces a hook that compiles, deploys, verifies, a
 
 Small, but it cost a compile cycle. `using StateLibrary for IPoolManager` does not apply to a variable typed as the concrete `PoolManager` — natural to do in tests, where you deploy the concrete contract. The error (`Member "getSlot0" not found`) does not hint that the fix is a cast to the interface. Attaching the library to both types, or a note in the library's docs, would remove the papercut.
 
+### Sep 4 (later) — first deployment to a live chain
+
+Both contracts on Arc testnet, and the full take-profit lifecycle in six real transactions. See
+[`arc/DEPLOYMENTS.md`](arc/DEPLOYMENTS.md). Two more findings, one of which cost real debugging time.
+
+#### 12. `StateLibrary.getSlot0` is not callable on a deployed PoolManager, and the revert says nothing
+
+Reading a pool's state off-chain is the single most common thing an integrator does, and it is a
+trap. `StateLibrary.getSlot0(manager, poolId)` reads like a method on the PoolManager — it is used
+that way everywhere in contract code, via `using StateLibrary for IPoolManager`. It is not one.
+There is no `getSlot0` selector on the deployed contract; the library computes a storage slot and
+reads it through `extsload`.
+
+So `cast call $POOL_MANAGER 'getSlot0(bytes32)' $POOL_ID` returns a bare `execution reverted`, with
+nothing pointing at the cause. Every off-chain consumer has to reimplement the slot arithmetic —
+`keccak256(poolId . uint256(6))`, then unpack `sqrtPriceX96`, `tick`, `protocolFee` and `lpFee` out
+of one word — and `POOLS_SLOT = 6` is an internal detail that can move between versions.
+
+Two things would fix this, either one sufficient: **ship real view functions on the PoolManager**
+(`getSlot0`, `getLiquidity`, `getPositionInfo`), or **publish a small off-chain package that does
+the slot math**, so that every indexer, dashboard and shell script is not reinventing it from the
+library source. Right now the on-chain and off-chain paths to the same state look identical and
+behave completely differently.
+
+#### 13. Rounding on a fully crossed range resolves in the LP's favour, measurably
+
+Following on from finding 9. On chain, a fully crossed range realised **+0.3489%** over its
+geometric mean, against the clean formula's +0.3009%. The extra ~0.048% is per-step rounding
+accumulating in the pool's direction.
+
+This is the right direction and we are not complaining about it. It is worth documenting precisely
+because anyone modelling a range strategy will compute the clean formula, see it disagree with
+reality, and have to work out from first principles whether they are looking at a rounding artefact
+or a bug in their own accounting. We spent a while on exactly that question.
+
 ---
 
 ## Summary for the Uniswap Foundation

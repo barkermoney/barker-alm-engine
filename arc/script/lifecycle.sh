@@ -57,8 +57,20 @@ POSITION_ID="${POSITION_ID:-1}"
 need() { [ -n "${!1:-}" ] || { echo "error: $1 is not set. Run deploy first, or export it." >&2; exit 1; }; }
 
 
+# Echo the command with the key redacted. `cast send` takes the key as an argument, so a naive
+# `echo "+ $*"` prints it in full — into terminal scrollback, CI logs, and session transcripts.
+# That is exactly how this project's deployer key ended up sitting in plaintext in 41 places.
 run() {
-  echo "+ $*"
+  local shown=()
+  local redact=0
+  for a in "$@"; do
+    if [ "$redact" = "1" ]; then shown+=("<redacted>"); redact=0
+    else
+      shown+=("$a")
+      [ "$a" = "--private-key" ] && redact=1
+    fi
+  done
+  echo "+ ${shown[*]}"
   if [ "${DRY_RUN:-0}" = "1" ]; then echo "  (dry run, not sent)"; return 0; fi
   "$@"
 }
@@ -81,8 +93,10 @@ preflight)
   echo "USDC (gas)   : $(cast call $USDC 'balanceOf(address)(uint256)' "$ME" --rpc-url "$RPC")"
   echo "BPROBE       : $(cast call $BPROBE 'balanceOf(address)(uint256)' "$ME" --rpc-url "$RPC")"
   echo "PoolManager  : $(cast code $POOL_MANAGER --rpc-url "$RPC" | wc -c) bytes of code"
-  [ -n "$POSITIONS" ] && echo "Positions    : $(cast code "$POSITIONS" --rpc-url "$RPC" | wc -c) bytes"
-  [ -n "$HOOK" ] && echo "Hook         : $(cast code "$HOOK" --rpc-url "$RPC" | wc -c) bytes"
+  # `[ -n ... ] && echo` as the last command of a branch makes the whole script exit 1 under
+  # `set -e` when the variable is empty. Use if.
+  if [ -n "$POSITIONS" ]; then echo "Positions    : $(cast code "$POSITIONS" --rpc-url "$RPC" | wc -c) bytes"; fi
+  if [ -n "$HOOK" ]; then echo "Hook         : $(cast code "$HOOK" --rpc-url "$RPC" | wc -c) bytes"; fi
   ;;
 
 init-pool)
@@ -112,12 +126,29 @@ open)
     "$(key)" "$TICK_LOWER" "$TICK_UPPER" "$LIQUIDITY" 0
   ;;
 
+pool-id)
+  # PoolId = keccak256(abi.encode(PoolKey)).
+  cast keccak "$(cast abi-encode 'f((address,address,uint24,int24,address))' "$(key)")"
+  ;;
+
 status)
   need POSITIONS
   echo "--- pool ---"
-  cast call "$POOL_MANAGER" 'getSlot0(bytes32)(uint160,int24,uint24,uint24)' \
-    "$(cast keccak "$(cast abi-encode 'f((address,address,uint24,int24,address))' "$(key)")")" \
-    --rpc-url "$RPC" 2>/dev/null || echo "(read poolId via the subgraph/indexer instead)"
+  # NOTE: there is no `getSlot0` on PoolManager. StateLibrary's getSlot0 is a helper that computes
+  # a storage slot and reads it through `extsload`; calling it as a contract method reverts. Off
+  # chain we have to do the same slot arithmetic ourselves: POOLS_SLOT = 6.
+  PID=$(cast keccak "$(cast abi-encode 'f((address,address,uint24,int24,address))' "$(key)")")
+  SLOT=$(cast keccak "$(cast concat-hex "$PID" 0x0000000000000000000000000000000000000000000000000000000000000006)")
+  RAW=$(cast call "$POOL_MANAGER" 'extsload(bytes32)(bytes32)' "$SLOT" --rpc-url "$RPC")
+  echo "poolId : $PID"
+  python3 -c "
+v = int('$RAW', 16)
+tick = (v >> 160) & 0xFFFFFF
+tick -= 1 << 24 if tick >= 1 << 23 else 0
+print(f'sqrtPriceX96 : {v & ((1 << 160) - 1)}')
+print(f'tick         : {tick}')
+print(f'lpFee        : {(v >> 208) & 0xFFFFFF}')
+"
   echo "--- position $POSITION_ID ---"
   cast call "$POSITIONS" 'getPosition(uint256)((address,address,uint24,int24,address),int24,int24,uint128,address,uint8,bool)' \
     "$POSITION_ID" --rpc-url "$RPC"
