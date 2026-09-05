@@ -7,14 +7,14 @@ Solo, 9 real days. All times **PT** (the author's local timezone, so event times
 | When | What | Note |
 |---|---|---|
 | Sep 4, 09:00 | Hacking begins | — |
-| **Sep 7, 20:59** | **Project check-in #1** | Eligibility gate, not optional |
-| **Sep 10, 20:59** | **Project check-in #2** | Eligibility gate + internal scope decision |
+| Sep 7, 20:59 | Project check-in #1 | Progress touchpoint, prompted by the dashboard — not a gate. See below. |
+| Sep 10, 20:59 | Project check-in #2 | Same, and the day the internal scope decision is made |
 | **Sep 13, 09:00** | **Submissions due** | 12:00 EDT. The real deadline — Sep 16 is only the finale. Late submissions are not accepted. |
 | Sep 14, 09:00 | Live judging (top ~20% only) | 7 minutes: **4 minutes demo + 3 minutes Q&A**, live, English. Round 1 has no bearing on partner prizes — most prize money goes to projects that never advance. |
 | Sep 16, 09:00 | Finale | Arc mainnet goes live the same day |
 | Sep 30 | Arc mainnet deployment deadline | For the Arc "push to mainnet" bounty |
 
-The effective window is **Sep 4 → Sep 13, 09:00**, which is nine days, not twelve. Everything below is planned backwards from check-in #1 rather than from the submission date, because the check-ins are the gates that can disqualify.
+The effective window is **Sep 4 → Sep 13, 09:00** — nine days, not twelve. Everything below is planned backwards from that submission deadline, which is the one date with no recovery from missing it.
 
 ## Where we actually are
 
@@ -71,7 +71,6 @@ breadth of features, not the legibility of the one screen that gets demoed.
 | When submissions open | Set submission type to **Top 10 Finalist & Partner Prizes** (decided Sep 5) | The radio lives on the prize step, which the site keeps disabled until submissions open. Round 1 async judging has no bearing on partner prizes, so opting in costs nothing but the Sep 14 live slot if we place. |
 | When submissions open | Select the three partner prizes: 1inch, Arc, Uniswap Foundation | Confirmed selectable — Uniswap's $2,000 track is labelled "only available to Continuity Track participants" |
 | Any time before Sep 12 | Uniswap Developer Feedback Form, with the `FEEDBACK.md` link | Without it the Uniswap entry does not qualify |
-| Early | Discord questions to the Arc sponsor | Answers affect how the mainnet link is delivered after the 13th |
 | Sep 12 | Demo video, recorded with the author's own voice | Rules forbid AI voiceover, phone recording, speed-ups, and anything under 720p or over 4 minutes |
 
 ### On the check-ins — corrected Sep 4
@@ -89,6 +88,19 @@ why no check-in action appears on it today. Do them when prompted; do not plan a
 they were the submission deadline.
 
 The one genuinely unrecoverable deadline is **Sep 13, 12:00 EDT**. Late submissions are not accepted.
+
+### Two questions we were going to ask the Arc sponsor, answered from the published rules
+
+**"Submissions close Sep 13 but Arc mainnet launches Sep 16 — how do we deliver the mainnet link
+afterwards?"** No special channel is needed. The Arc brief asks for a project "deployed **or
+deployment-ready** on Arc mainnet by September 30", so being deployment-ready at submission already
+satisfies it; and the submission form states plainly that *"you can still update your project after
+submitting."* The route is therefore: deploy on Sep 16, update the README and the project entry.
+
+**"Can one Continuity project be considered for both Arc sub-bounties at once?"** Yes. The official
+rules: *"If a partner has multiple tracks, you can be eligible for all of them while only counting
+as 1 Partner Prize."* Both Arc tracks we target are Continuity-marked, and together they consume one
+of our three slots.
 
 ## The scope decision at check-in #2 (Sep 10)
 
