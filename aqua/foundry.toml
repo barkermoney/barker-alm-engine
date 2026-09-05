@@ -1,0 +1,24 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+libs = ["lib"]
+solc_version = "0.8.30"
+optimizer = true
+optimizer_runs = 700
+via_ir = true
+
+# Matches the upstream SwapVM profile. Divergence here shows up as stack-too-deep
+# in the vendored sources rather than in our own, which is a miserable way to spend
+# an afternoon.
+
+remappings = [
+    "forge-std/=lib/swap-vm/node_modules/forge-std/src/",
+    "@openzeppelin/contracts/=lib/swap-vm/node_modules/@openzeppelin/contracts/",
+    "@1inch/solidity-utils/=lib/swap-vm/node_modules/@1inch/solidity-utils/",
+    "@1inch/aqua/=lib/swap-vm/node_modules/@1inch/aqua/",
+    "swap-vm/=lib/swap-vm/",
+]
+
+[rpc_endpoints]
+mainnet = "${ETHEREUM_RPC_URL}"
