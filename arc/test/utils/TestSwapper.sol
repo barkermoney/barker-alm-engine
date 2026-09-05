@@ -65,6 +65,9 @@ contract TestSwapper is IUnlockCallback {
         return abi.encode(delta);
     }
 
+    // Test helper: casts are bounded by the sign check, and the mock ERC-20 reverts rather than
+    // returning false, so the production-grade guards in BarkerV4Positions are not repeated here.
+    // forge-lint: disable-start(unsafe-typecast, erc20-unchecked-transfer)
     function _settle(Currency c, int128 amount, address payer) internal {
         if (amount < 0) {
             manager.sync(c);
@@ -74,4 +77,5 @@ contract TestSwapper is IUnlockCallback {
             manager.take(c, payer, uint256(uint128(amount)));
         }
     }
+    // forge-lint: disable-end(unsafe-typecast, erc20-unchecked-transfer)
 }

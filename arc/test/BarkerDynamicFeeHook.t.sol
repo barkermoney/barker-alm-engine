@@ -117,6 +117,8 @@ contract BarkerDynamicFeeHookTest is Base {
 
         (uint24 fee, uint24 surge, int24 move) = _swapAndReadFee(false, -1e6, 6000);
         assertGt(move, 0);
+        // safe: asserted positive on the line above
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(surge, uint24(uint24(move)) * SURGE_PER_TICK, "surge = ticksMoved * surgePerTick");
         assertEq(fee, BASE_FEE + surge);
     }
