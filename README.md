@@ -84,3 +84,4 @@ FEEDBACK.md    Uniswap v4 integration experience — the good, the sharp edges
 - Barker — https://barker.money
 - Architecture — [`docs/architecture.md`](docs/architecture.md)
 - Build schedule — [`docs/schedule.md`](docs/schedule.md)
+- Environment & pinned addresses — [`docs/environment.md`](docs/environment.md)
