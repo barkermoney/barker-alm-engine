@@ -68,7 +68,8 @@ breadth of features, not the legibility of the one screen that gets demoed.
 | When | What | Why it is blocking |
 |---|---|---|
 | Sep 7 / Sep 10, 20:59 | Project check-ins | Progress touchpoints; the dashboard prompts when it is time. See the note below. |
-| Any time before Sep 12 | Confirm Uniswap is selectable for a Continuity project on the submission form | The last execution confirmation from the prize plan. The prize step unlocks after the earlier form steps are filled. |
+| When submissions open | Set submission type to **Top 10 Finalist & Partner Prizes** (decided Sep 5) | The radio lives on the prize step, which the site keeps disabled until submissions open. Round 1 async judging has no bearing on partner prizes, so opting in costs nothing but the Sep 14 live slot if we place. |
+| When submissions open | Select the three partner prizes: 1inch, Arc, Uniswap Foundation | Confirmed selectable — Uniswap's $2,000 track is labelled "only available to Continuity Track participants" |
 | Any time before Sep 12 | Uniswap Developer Feedback Form, with the `FEEDBACK.md` link | Without it the Uniswap entry does not qualify |
 | Early | Discord questions to the Arc sponsor | Answers affect how the mainnet link is delivered after the 13th |
 | Sep 12 | Demo video, recorded with the author's own voice | Rules forbid AI voiceover, phone recording, speed-ups, and anything under 720p or over 4 minutes |
