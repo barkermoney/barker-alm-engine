@@ -45,7 +45,7 @@ becomes a much cheaper choice about how much dashboard to build.
 
 | Day | Focus | Done when |
 |---|---|---|
-| **D2 — Sep 5** | Aqua leg starts early. Pin the official Aqua/SwapVM contracts, stand up the mainnet fork, `Extruction` solvency guard capping quotes at `min(virtual, redeemable, allowance)`. | Guard caps a quote correctly in a Foundry test against official contracts |
+| **D2 — Sep 5** | Aqua leg starts early. Pin the official Aqua/SwapVM contracts, stand up the mainnet fork, `Extruction` solvency guard capping quotes at `min(virtual, redeemable, allowance)`. | **done Sep 5** — 27 tests green: 14 unit, 7 through an unmodified `SwapVMRouter`, 6 on an Ethereum mainnet fork against live steakUSDC |
 | **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | A fill on the fork redeems from the vault atomically |
 | **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | Both legs demonstrable |
 | **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | Keeper closes a testnet position unattended |
@@ -56,6 +56,21 @@ becomes a much cheaper choice about how much dashboard to build.
 
 Two full days of buffer at the end. For a solo run that is the right shape; the failure mode of a
 nine-day sprint is not running out of ideas, it is running out of Sunday.
+
+### Sep 5 — one finding that changes D3's premise
+
+The Aqua leg was planned assuming the maker would run on the **Aqua custodial track**. It cannot.
+Capital held in the Aqua ledger has stopped earning, which is the whole point of a yield-backed
+maker; the same fact shows up as `AquaOpcodes` having no `StaticBalances`, since on that track
+reserves come from the ledger's accounting rather than from the strategy. So the maker runs on the
+**signature track**: assets stay in the vault, `SwapVMRouter` pulls against an allowance, and
+`IMakerHooks` redeems just in time.
+
+This does not cost the 1inch submission anything — the build still runs on official SwapVM through
+the official `Extruction` opcode, which is what the brief asks for — and it sharpens the story
+rather than weakening it, because the constraint itself is a finding worth reporting
+([`FEEDBACK-1INCH.md`](../FEEDBACK-1INCH.md) §5). It does change D3: settlement has to move assets
+between the vault and the maker's own address, not between the vault and the ledger.
 
 **One caveat on compressing the dashboard.** The official judging criteria are Technicality,
 Originality, Practicality, **Usability (UI/UX/DX)** and WOW Factor — five categories, so the

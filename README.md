@@ -19,7 +19,7 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Track | Continuity — hacking on an existing project |
 | Team | solo |
 | Arc leg | deployed to Arc testnet, full lifecycle verified on chain ([tx list](arc/DEPLOYMENTS.md)) |
-| Aqua leg | not started (scheduled D5–D8) |
+| Aqua leg | solvency guard live on an Ethereum mainnet fork against real steakUSDC ([details](aqua/README.md)); settlement hooks next |
 
 ---
 
@@ -46,6 +46,22 @@ Prior *product* work at Barker (the yield index, the execution layer, the ALM po
 | Pre-hackathon v4 probe (helper + hook skeleton + CREATE2 hook mining) | `research/arc-probe/src/V4SidedHelper.sol`, `research/arc-probe/src/DynamicFeeHookStub.sol`, `research/arc-probe/script/MineHook.s.sol` |
 
 Uniswap v4 is not a bolt-on here — the one-sided concentrated liquidity position *is* the product primitive, and the hook is what makes the fee schedule adapt to volatility.
+
+---
+
+## 1inch SwapVM / Aqua integration — where to look
+
+*(pointers for judging; see [`FEEDBACK-1INCH.md`](FEEDBACK-1INCH.md) for the integration experience write-up)*
+
+| What | Where |
+|---|---|
+| `Extruction` target — quote-time solvency guard | [`aqua/src/YieldBackedSolvencyGuard.sol`](aqua/src/YieldBackedSolvencyGuard.sol), `extruction()` |
+| The cap itself — `min(virtual reserve, liquid + redeemable, allowance)` | same file, `deliverableAmount()` |
+| Strategy program placing the guard between reserves and curve | [`aqua/test/SolvencyGuardOnSwapVM.t.sol`](aqua/test/SolvencyGuardOnSwapVM.t.sol), `_order()` |
+| Guard running inside an unmodified `SwapVMRouter` | same file |
+| Live steakUSDC on an Ethereum mainnet fork | [`aqua/test/SolvencyGuardMainnetFork.t.sol`](aqua/test/SolvencyGuardMainnetFork.t.sol) |
+
+No upstream source is modified — SwapVM is consumed as a dependency and extended through its own published extension point. What the guard buys is that a maker whose capital is earning yield in an ERC-4626 vault can quote against the *vault position* rather than against fictional reserves, so it never quotes a fill it cannot settle. See [`aqua/README.md`](aqua/README.md).
 
 ---
 
@@ -77,6 +93,7 @@ app/           Minimal multi-position dashboard (MIT)
 docs/          Architecture, schedule, specs
 research/      Pre-hackathon feasibility probe (documented, not a submission artifact)
 FEEDBACK.md    Uniswap v4 integration experience — the good, the sharp edges
+FEEDBACK-1INCH.md  SwapVM / Aqua integration experience
 ```
 
 ## Links
