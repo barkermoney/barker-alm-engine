@@ -15,8 +15,9 @@ That only works if the quoting side knows the difference between the reserves a 
 | Contract | What it does |
 |---|---|
 | [`src/YieldBackedSolvencyGuard.sol`](src/YieldBackedSolvencyGuard.sol) | An `Extruction` target that caps quotable depth at `min(virtual reserve, liquid + redeemable, allowance)` — evaluated at quote time, against the live vault position. |
+| [`src/YieldBackedSettlement.sol`](src/YieldBackedSettlement.sol) | An `IMakerHooks` target that settles fills against the vault: `preTransferOut` redeems the payout just in time, `postTransferIn` deposits the taker's payment before the transaction ends, and a per-order **buffer ratio** decides how much stays liquid between fills. |
 
-Settlement (`IMakerHooks`: redeem-on-fill, redeposit-on-receive) lands next; see [`../docs/schedule.md`](../docs/schedule.md).
+Together they close the loop: the guard makes the *quote* honest, settlement makes the *fill* work — `test_quoteAndSettlementAgree` pins the joint invariant that the quoted amount and the settled amount are the same number, on mocks and on a mainnet fork against live steakUSDC.
 
 ## How the guard works
 
@@ -36,6 +37,27 @@ Three properties worth calling out, each pinned by a test:
 - **Ceiling, never floor.** A modest reserve is left alone; the guard can only reduce. Raising it would be a way to quote depth the strategy never authorised.
 - **Reads `maxWithdraw`, not `convertToAssets`.** A vault that cannot currently service a redemption is not backing anything, whatever the share price says. MetaMorpho vaults deploy into Morpho markets and throttle exactly this way when markets are fully utilised.
 - **Quote and swap cannot diverge.** `IExtruction` and `IStaticExtruction` share one selector, so implementing only the `view` form puts both paths on the same bytecode. This is structural, not a convention — see [`../FEEDBACK-1INCH.md`](../FEEDBACK-1INCH.md) §2.
+
+## How settlement works
+
+SwapVM pays the taker with a plain `transferFrom(maker, taker)`, so at transfer time the quoted
+amount has to exist as loose tokens in the maker's wallet — which is exactly what a yield-backed
+maker does not keep. Two hooks bridge the gap, both running inside the swap transaction:
+
+- **`preTransferOut` — redeem-on-fill.** If the wallet holds less than the fill needs, the
+  difference is withdrawn from the vault, plus enough on top to restore the liquid buffer. One
+  redemption serves this fill and the next few.
+- **`postTransferIn` — redeposit-on-receive.** Anything above the buffer target goes straight back
+  into that side's vault: inbound inventory starts earning in the same transaction that delivered it.
+
+The **buffer ratio** (basis points of the total position, per order side) is the knob between gas
+and yield: at 0 every fill touches the vault and every incoming dollar is deposited immediately;
+a wider buffer absorbs small fills entirely at the cost of keeping that slice idle.
+
+The settlement contract holds no funds and has no owner. It acts only on maker allowances, and
+every token it moves goes between the maker and a vault position owned by the maker. A maker
+enables it with three approvals: payout token → router (the swap itself), vault shares → settlement
+(redeem-on-fill), inbound token → settlement (redeposit). Revoking any of them switches that leg off.
 
 ## Why the signature track, not the Aqua custodial track
 

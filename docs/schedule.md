@@ -46,8 +46,8 @@ becomes a much cheaper choice about how much dashboard to build.
 | Day | Focus | Done when |
 |---|---|---|
 | **D2 — Sep 5** | Aqua leg starts early. Pin the official Aqua/SwapVM contracts, stand up the mainnet fork, `Extruction` solvency guard capping quotes at `min(virtual, redeemable, allowance)`. | **done Sep 5** — 27 tests green: 14 unit, 7 through an unmodified `SwapVMRouter`, 6 on an Ethereum mainnet fork against live steakUSDC |
-| **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | A fill on the fork redeems from the vault atomically |
-| **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | Both legs demonstrable |
+| **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | **done Sep 7** (a day late, absorbed by the banked slack) — `YieldBackedSettlement.sol`, real signed fills through an unmodified router, 9 tests |
+| **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | **done Sep 7** — both directions against live steakUSDC on a mainnet fork incl. a round trip, buffer ratio in settlement, 4 fork tests; suite total 40 green. Check-in #1 submitted. |
 | **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | Keeper closes a testnet position unattended |
 | **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | Dashboard shows live testnet positions and the Aqua maker |
 | **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | Whatever is behind gets this day |
