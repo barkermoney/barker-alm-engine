@@ -108,16 +108,100 @@ the slot math**, so that every indexer, dashboard and shell script is not reinve
 library source. Right now the on-chain and off-chain paths to the same state look identical and
 behave completely differently.
 
-#### 13. Rounding on a fully crossed range resolves in the LP's favour, measurably
+#### 13. A fully crossed range matches the clean formula to one part in a million — *retracted and corrected*
 
-Following on from finding 9. On chain, a fully crossed range realised **+0.3489%** over its
-geometric mean, against the clean formula's +0.3009%. The extra ~0.048% is per-step rounding
-accumulating in the pool's direction.
+**This finding originally said the opposite, and it was wrong. The correction is more useful than
+the original claim, so it is left in rather than quietly edited.**
 
-This is the right direction and we are not complaining about it. It is worth documenting precisely
-because anyone modelling a range strategy will compute the clean formula, see it disagree with
-reality, and have to work out from first principles whether they are looking at a rounding artefact
-or a bug in their own accounting. We spent a while on exactly that question.
+The first version reported that a fully crossed range realised **+0.3489%** over its geometric mean
+against the clean formula's +0.3009%, and attributed the ~0.048% gap to v4 per-step rounding
+resolving in the liquidity provider's favour. That is a plausible sentence. It is also a story
+invented to explain a transcription error: the swap and close amounts had both been copied 1,024
+raw units (0x400) high.
+
+Re-read from the `Swap` and `PositionClosed` event payloads by a machine instead of by hand
+(`keeper/`, added Sep 8), the same on-chain position returns **2.136890 USDC**, and:
+
+| | |
+|---|---|
+| Realised premium over the range's geometric mean | **+0.3008%** |
+| `fee / (1 − fee)` at 0.30% | **+0.3009%** |
+
+Agreement to within one part in a million, with no rounding term needed at all.
+
+**The finding for Uniswap is the meta one.** v4's range math is exact enough that a discrepancy of
+five basis points is *always* your own bug — but nothing in the tooling encourages you to believe
+that. There is no canonical "what did this position actually realise" reader, so integrators
+hand-copy amounts out of block explorers, and a hand-copied number that is nearly right is far more
+dangerous than one that is obviously wrong: it survives review, and someone writes a plausible
+mechanism to explain it. A first-party position-accounting helper would have prevented both the
+error and the four days it survived.
+
+#### 14. `getSlot0` is a library function, and off-chain clients pay for that
+
+`StateLibrary.getSlot0(manager, poolId)` reads like a method on the PoolManager. It is not — it is
+a helper that computes `keccak256(abi.encode(poolId, uint256(6)))` and reads it through `extsload`.
+Solidity callers never notice, because `using StateLibrary for IPoolManager` makes the call look
+native. **Off-chain callers hit a wall**: there is no `getSlot0` in the deployed ABI, so the obvious
+`readContract({ functionName: "getSlot0" })` fails, and the error says the function does not exist
+rather than "this lives in a library, do the slot arithmetic yourself."
+
+Every off-chain consumer of v4 therefore reimplements the storage layout — pools at slot 6,
+`liquidity` at offset 3, position state at offset 6, plus the packed `slot0` word with its
+sign-extended `int24` tick. We did it twice, once in bash and once in TypeScript
+([`keeper/src/poolState.ts`](keeper/src/poolState.ts)), and both are pinned by tests against a live
+Arc pool because getting the sign extension wrong yields a tick of ~16 million rather than an error.
+
+**Ask:** publish the storage layout as a first-class, versioned artifact, or ship a thin read-only
+`StateView`-style contract with the getters on it. Today the canonical description of v4's storage
+layout is Solidity library source, which is not a format a TypeScript indexer can consume.
+
+#### 15. `getFeeGrowthInside` reads like "fees owed" and is off by 2**128
+
+Our own bug, found on Sep 8 and worth reporting because the shape of it is v4's, not ours. A view
+that returned uncollected fees was implemented as:
+
+```solidity
+(fee0, fee1) = poolManager.getFeeGrowthInside(id, tickLower, tickUpper);
+```
+
+It compiles, returns two plausible `uint256`s, and is meaningless: fee *growth* is a Q128
+per-unit-of-liquidity accumulator, while fee *owed* is
+`liquidity * (growthInside - growthInsideLast) / 2**128`. The two differ by roughly 38 orders of
+magnitude, so the failure is not a rounding error — it is a number with no relationship to
+anything, displayed next to a currency symbol.
+
+Nothing in the naming, the return types, or the NatSpec distinguishes them, and the correct
+computation needs a *second* call (`getPositionInfo`, for `liquidity` and the `…Last` snapshots)
+plus a deliberately wrapping subtraction. The fix and the test that pins it are in
+[`arc/src/BarkerV4Positions.sol`](arc/src/BarkerV4Positions.sol) (`feesOwed`) and
+[`arc/test/BarkerV4Positions.t.sol`](arc/test/BarkerV4Positions.t.sol)
+(`test_feesOwed_matchesWhatCollectPays` — asserting the view against what `collect` actually pays,
+which is the only assertion a wrong-but-consistent implementation cannot satisfy).
+
+**Ask:** a `feesOwed(poolId, positionKey)` helper in `StateLibrary`. Everyone building on v4 needs
+this number, everyone derives it from the same two calls, and the intermediate value is one an
+integrator can plausibly mistake for the answer.
+
+#### 16. A surge-fee hook needs the clock on *both* halves — our own design bug
+
+Found on Sep 8 by our own keeper, on chain, which is the good way to find it. Our dynamic fee hook
+charges `baseFee + surge`, where surge accumulates with `|tick moved since the previous swap|` and
+decays linearly over `decayBlocks`. On a pool whose previous swap was four days earlier, it applied
+**2.46%** (`FeeApplied(fee=24600, surge=21600, tickMove=1080)`) to a routine trade.
+
+The bug is a clean one to name: **the decay is time-aware and the measurement is not.** Stored
+surge decays with elapsed blocks, but the new contribution is `|currentTick - lastTick|` with no
+reference to how long that took, so 1,080 ticks of drift over four days is charged exactly like
+1,080 ticks in one block. Half the mechanism has a clock and the other half does not.
+
+This is not a v4 defect — v4 gave us exactly the primitive we asked for. It is a warning for anyone
+writing their first volatility-responsive hook, and it is the kind of thing a "common hook
+pitfalls" page in the docs would have caught before it reached a chain. `beforeSwap` fires on swap
+boundaries, not on a schedule, so *any* hook state derived from "since last call" is sampling an
+interval of unknown length. The fix we intend is to treat an observation older than `decayBlocks` as
+no observation at all — re-baseline and charge the base fee — which is what the hook already does
+for a pool it has never seen.
 
 ---
 

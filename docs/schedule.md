@@ -48,7 +48,7 @@ becomes a much cheaper choice about how much dashboard to build.
 | **D2 — Sep 5** | Aqua leg starts early. Pin the official Aqua/SwapVM contracts, stand up the mainnet fork, `Extruction` solvency guard capping quotes at `min(virtual, redeemable, allowance)`. | **done Sep 5** — 27 tests green: 14 unit, 7 through an unmodified `SwapVMRouter`, 6 on an Ethereum mainnet fork against live steakUSDC |
 | **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | **done Sep 7** (a day late, absorbed by the banked slack) — `YieldBackedSettlement.sol`, real signed fills through an unmodified router, 9 tests |
 | **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | **done Sep 7** — both directions against live steakUSDC on a mainnet fork incl. a round trip, buffer ratio in settlement, 4 fork tests; suite total 40 green. Check-in #1 submitted. |
-| **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | Keeper closes a testnet position unattended |
+| **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | **done Sep 8** — position #2 closed unattended on Arc testnet by a keeper on its own key ([`keeper/`](../keeper/), 15 tests); indexer rebuilds both positions and 19 pools from events; two real bugs found and one fixed |
 | **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | Dashboard shows live testnet positions and the Aqua maker |
 | **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | Whatever is behind gets this day |
 | **D8 — Sep 11** | README, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, video script and rehearsal. | Everything written except the recording |
@@ -125,6 +125,15 @@ should already be done rather than at risk, so the decision is no longer whether
 prize submission.
 
 **What now gets decided on Sep 10, in this order:**
+
+0. **Whether to redeploy the dynamic fee hook.** Added Sep 8, and it outranks the rest because it
+   is the only item with a consequence that cannot be undone later. The hook bills price drift
+   without normalising for elapsed time, and charged 2.46% to a routine swap on Arc testnet
+   (`FEEDBACK.md` §16). The fix is four lines. The cost is not: a hook's permission bits live in its
+   address, so a corrected hook is a new address, a new `PoolKey`, and a new pool — which abandons
+   the pool whose two documented lifecycles are the Arc leg's on-chain evidence. Either we redeploy
+   *and* re-run both lifecycles to keep the evidence intact, or we ship the known defect documented
+   and tested. Both are defensible; drifting into the second by not deciding is not.
 
 1. **How much dashboard.** The honest floor is a page that lists positions and their state. Anything
    past that is presentation, and presentation is what gets cut first.

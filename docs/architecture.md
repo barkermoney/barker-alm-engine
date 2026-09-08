@@ -12,10 +12,10 @@ flowchart TB
         UI["Multi-position view<br/>PnL · fees · range status"]
     end
 
-    subgraph engine["Shared position engine (MIT)"]
-        LC["Position lifecycle<br/>open · monitor · rebalance · close"]
-        MATH["Range math<br/>tick ↔ price ↔ liquidity"]
-        ACC["Settlement accounting"]
+    subgraph engine["keeper/ — indexer + keeper (MIT)"]
+        LC["Policy<br/>pure: snapshot → hold · arm · collect · close"]
+        MATH["Pool state<br/>extsload · slot0 · tick math"]
+        ACC["Event store<br/>idempotent · atomic cursor"]
     end
 
     subgraph private["Strategy brain — PRIVATE, not in this repo"]
@@ -80,11 +80,34 @@ The maker's inventory lives in an ERC-4626 vault. Two official extension points 
 
 A liquidity buffer ratio keeps a working balance liquid so that common fills do not each pay for a vault round-trip.
 
+## The keeper — what makes the Arc leg *automated* rather than merely *possible*
+
+A one-sided range has a definite end: the moment it has fully converted. Until something watches for
+that moment and acts on it, the primitive is a manual trade with extra steps. [`keeper/`](../keeper/)
+is that watcher, and it closed a real Arc testnet position on its own on Sep 8, 2026.
+
+Three properties are load-bearing, and they are the ones worth reviewing:
+
+1. **The decision is a pure function.** Exit policy is a snapshot in, a verdict out — no clients, no
+   clock, no I/O — so the rule a reviewer reads is the rule that runs, and it is tested without a
+   node. A policy smeared across a polling loop is a policy nobody can check.
+2. **The keeper hesitates.** The exit condition must survive three consecutive observations. A block
+   that wicks past the range top and returns is not a converted ladder, and closing on it realises
+   the wick instead of the trend.
+3. **The keeper cannot steal.** `close` and `collect` take no recipient and always pay the position's
+   owner, so a stolen keeper key buys an attacker nothing but early exits into the victim's own
+   wallet. The Sep 8 run used a separate keeper key precisely so that claim is demonstrated rather
+   than asserted.
+
+The indexer beneath it exists because v4 keeps every pool inside one singleton: there is no per-pair
+contract to query, so a pool's history *is* `Initialize` / `ModifyLiquidity` / `Swap` plus
+`extsload`. The dashboard reads the folded result rather than walking chain state.
+
 ## Repository ↔ license map
 
 | Directory | License | Rationale |
 |---|---|---|
-| `arc/`, `app/`, `docs/`, engine code | MIT | Independent works; only form calldata and read state |
+| `arc/`, `keeper/`, `app/`, `docs/` | MIT | Independent works; only form calldata and read state |
 | `aqua/` | SwapVM-1.1 | Plugs into SwapVM's address space → a Modification under §1.7 |
 | `research/` | MIT | Pre-hackathon probe, documented as such |
 

@@ -18,8 +18,9 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Event | ETHOnline 2026 (Sep 4 – Sep 16, 2026) |
 | Track | Continuity — hacking on an existing project |
 | Team | solo |
-| Arc leg | deployed to Arc testnet, full lifecycle verified on chain ([tx list](arc/DEPLOYMENTS.md)) |
-| Aqua leg | solvency guard live on an Ethereum mainnet fork against real steakUSDC ([details](aqua/README.md)); settlement hooks next |
+| Arc leg | deployed to Arc testnet; two full lifecycles verified on chain, the second **closed unattended by the keeper** ([tx list](arc/DEPLOYMENTS.md)) |
+| Aqua leg | solvency guard and settlement live on an Ethereum mainnet fork against real steakUSDC ([details](aqua/README.md)) |
+| Automation | [`keeper/`](keeper/) — v4 event indexer and unattended keeper; closed Arc testnet position #2 on its own, Sep 8 |
 
 ---
 
@@ -43,6 +44,10 @@ Prior *product* work at Barker (the yield index, the execution layer, the ALM po
 | v4 hook (dynamic fee, `afterInitialize` → `updateDynamicLPFee`) | `arc/src/` — see directory README |
 | PoolManager interaction (`unlock` / `unlockCallback` → `modifyLiquidity` / `swap`, `sync`/`settle`/`take`) | `arc/src/` |
 | One-sided range minting (the take-profit primitive) | `arc/src/` |
+| Correct `feesOwed` — `liquidity × (growthInside − growthInsideLast) / 2**128`, not the raw accumulator | [`arc/src/BarkerV4Positions.sol`](arc/src/BarkerV4Positions.sol), `feesOwed` |
+| Reading v4 pool state off chain — `pools` slot 6, packed `slot0`, sign-extended `int24` tick | [`keeper/src/poolState.ts`](keeper/src/poolState.ts) |
+| Indexing `Initialize` / `ModifyLiquidity` / `Swap` and folding them into positions | [`keeper/src/indexer.ts`](keeper/src/indexer.ts) |
+| The exit rule, as one pure testable function | [`keeper/src/policy.ts`](keeper/src/policy.ts), `decide` |
 | Pre-hackathon v4 probe (helper + hook skeleton + CREATE2 hook mining) | `research/arc-probe/src/V4SidedHelper.sol`, `research/arc-probe/src/DynamicFeeHookStub.sol`, `research/arc-probe/script/MineHook.s.sol` |
 
 Uniswap v4 is not a bolt-on here — the one-sided concentrated liquidity position *is* the product primitive, and the hook is what makes the fee schedule adapt to volatility.
@@ -89,6 +94,7 @@ This project was built with AI assistance (Claude Code). [`AI-DISCLOSURE.md`](AI
 ```
 arc/           Arc leg — Uniswap v4 hook + one-sided CL manager (MIT)
 aqua/          Aqua leg — SwapVM extensions, ERC-4626 backed maker (SwapVM-1.1)
+keeper/        v4 event indexer + unattended position keeper (MIT)
 app/           Minimal multi-position dashboard (MIT)
 docs/          Architecture, schedule, specs
 research/      Pre-hackathon feasibility probe (documented, not a submission artifact)
