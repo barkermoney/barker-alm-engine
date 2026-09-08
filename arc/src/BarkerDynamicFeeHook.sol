@@ -133,6 +133,20 @@ contract BarkerDynamicFeeHook is IHooks {
         return IHooks.afterInitialize.selector;
     }
 
+    /// @dev 🔴 **Known defect, discovered on chain Sep 8 2026 — the decay is time-aware and the
+    ///      measurement is not.** Stored `surge` decays over `decayBlocks`, but the new
+    ///      contribution is `|currentTick - obs.lastTick| * surgePerTick` with no reference to how
+    ///      long that move took. `beforeSwap` fires on swap boundaries, not on a schedule, so on a
+    ///      quiet pool `obs` can be arbitrarily old and slow drift gets billed as a spike. The
+    ///      deployed hook charged 2.46% to the first swap in four days for exactly this reason —
+    ///      `FeeApplied(fee=24600, surge=21600, tickMove=1080)`, see `DEPLOYMENTS.md`.
+    ///
+    ///      Intended fix: treat an observation older than `decayBlocks` as no observation at all —
+    ///      re-baseline and charge `baseFee`, which is already what the `!obs.initialized` branch
+    ///      below does for an unseen pool. Deliberately **not** applied yet: the hook's address
+    ///      carries its permission bits, so changing it means a new hook address, which means a new
+    ///      `PoolKey`, which means abandoning the pool whose lifecycle this repository documents.
+    ///      Pinned by `test_KNOWN_DEFECT_*` in the test suite and tracked in `FEEDBACK.md` §16.
     function beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
         external
         onlyPoolManager

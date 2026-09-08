@@ -167,6 +167,75 @@ contract BarkerDynamicFeeHookTest is Base {
         assertEq(feeCold, BASE_FEE);
     }
 
+    /// @notice 🔴 KNOWN DEFECT, pinned deliberately: a price move is charged at full rate no matter
+    ///         how long it took. Stored surge decays with elapsed blocks; the *new* contribution
+    ///         does not, so drift accumulated over days is billed as though it happened in a block.
+    ///
+    /// @dev This is not a hypothetical. On Arc testnet on Sep 8 the deployed hook charged **2.46%**
+    ///      (`FeeApplied(fee=24600, surge=21600, tickMove=1080)`) to the first swap in four days,
+    ///      purely because the previous observation was four days old. See `FEEDBACK.md` §16 and
+    ///      `DEPLOYMENTS.md`.
+    ///
+    ///      The test asserts the behaviour as it currently is rather than as it should be, so that
+    ///      the intended fix — treat an observation older than `decayBlocks` as no observation,
+    ///      re-baseline, and charge the base fee — turns this test red on purpose when it lands.
+    function test_KNOWN_DEFECT_staleObservationIsChargedAsIfInstant() public {
+        // Establish an observation, then move the price a long way.
+        vm.prank(alice);
+        swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
+        vm.prank(bob);
+        swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
+
+        // Now let an eternity pass with no trading at all. Any stored surge decays to nothing —
+        // that half of the mechanism works.
+        vm.roll(block.number + DECAY_BLOCKS * 1000);
+
+        (uint24 fee, uint24 surge, int24 move) = _swapAndReadFee(false, -1, 6000);
+
+        assertGt(move, 0, "the tick did move, a very long time ago");
+        assertGt(surge, 0, "and it is charged in full despite the age of the observation");
+        assertEq(fee, BASE_FEE + surge);
+
+        // The precise statement of the bug: elapsed time changed nothing about the charge.
+        // safe: `move` asserted positive above
+        // forge-lint: disable-next-line(unsafe-typecast)
+        assertEq(surge, uint24(uint24(move)) * SURGE_PER_TICK, "no time normalisation is applied");
+    }
+
+    /// @notice The same movement, charged after one block instead of after an eternity, costs the
+    ///         same. Two tests are needed to state the defect: one shows the charge survives age,
+    ///         this one shows age is not an input at all.
+    function test_KNOWN_DEFECT_ageOfObservationDoesNotChangeTheCharge() public {
+        uint256 snap = vm.snapshotState();
+
+        vm.prank(alice);
+        swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
+        vm.prank(bob);
+        swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
+        vm.roll(block.number + 1);
+        (, uint24 surgeFresh,) = _swapAndReadFee(false, -1, 6000);
+
+        vm.revertToState(snap);
+
+        vm.prank(alice);
+        swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
+        vm.prank(bob);
+        swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
+        vm.roll(block.number + DECAY_BLOCKS * 1000);
+        (, uint24 surgeStale,) = _swapAndReadFee(false, -1, 6000);
+
+        // Not exactly equal: the fresh case still carries a sliver of the *previous* swap's stored
+        // surge, which one block of decay has barely touched, while the stale case has decayed
+        // that residue to nothing. That residue is the only thing elapsed time affects — the move
+        // itself is billed at full rate in both cases, which is the defect.
+        assertGe(surgeFresh, surgeStale, "the fresh case additionally carries undecayed residue");
+        assertGt(
+            uint256(surgeStale) * 1000,
+            uint256(surgeFresh) * 999,
+            "1000 decay windows of waiting removed under 0.1% of the charge"
+        );
+    }
+
     /// @notice A violent move pins the fee at the ceiling rather than overflowing it.
     function test_hugeMove_clampsAtMaxFee() public {
         vm.prank(governance);
