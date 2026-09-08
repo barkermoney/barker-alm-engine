@@ -250,6 +250,64 @@ contract BarkerV4PositionsTest is Base {
         assertEq(positions.getPosition(id).liquidity, 1e18, "principal untouched");
     }
 
+    /// @notice `feesOwed` must predict, to the wei, what `collect` actually pays out.
+    ///
+    /// @dev This is the test that catches the whole class of bug the view originally had: returning
+    ///      `getFeeGrowthInside` compiles, returns two plausible-looking uint256s, and is off by
+    ///      roughly 2**128. Asserting the view against the pool's own settlement is the only check
+    ///      that cannot be satisfied by a wrong-but-consistent implementation.
+    function test_feesOwed_matchesWhatCollectPays() public {
+        vm.prank(alice);
+        uint256 id = positions.open(key, 600, 1200, 1e18, BarkerV4Positions.Side.Upper);
+
+        vm.prank(bob);
+        swapper.swap(key, false, -1e17, TickMath.getSqrtPriceAtTick(900));
+        vm.prank(bob);
+        swapper.swap(key, true, -1e17, TickMath.getSqrtPriceAtTick(0));
+
+        (uint256 owed0, uint256 owed1) = positions.feesOwed(id);
+        assertGt(owed0 + owed1, 0, "trading through the range should have earned fees");
+
+        vm.prank(alice);
+        (uint256 paid0, uint256 paid1) = positions.collect(id);
+
+        assertEq(owed0, paid0, "fee0 quoted must equal fee0 paid");
+        assertEq(owed1, paid1, "fee1 quoted must equal fee1 paid");
+
+        // And having been swept, the view must read zero rather than repeating the same claim.
+        (uint256 after0, uint256 after1) = positions.feesOwed(id);
+        assertEq(after0 + after1, 0, "nothing owed immediately after a collect");
+    }
+
+    /// @dev A position that has never been traded through owes nothing — not "a very large Q128
+    ///      number that happens to be nonzero", which is what the accumulator would report.
+    function test_feesOwed_isZeroBeforeAnyTrading() public {
+        vm.prank(alice);
+        uint256 id = positions.open(key, 600, 1200, 1e18, BarkerV4Positions.Side.Upper);
+
+        (uint256 owed0, uint256 owed1) = positions.feesOwed(id);
+        assertEq(owed0, 0);
+        assertEq(owed1, 0);
+    }
+
+    function test_feesOwed_isZeroAfterClose() public {
+        vm.prank(alice);
+        uint256 id = positions.open(key, 600, 1200, 1e18, BarkerV4Positions.Side.Upper);
+        vm.prank(bob);
+        swapper.swap(key, false, -1e17, TickMath.getSqrtPriceAtTick(900));
+
+        vm.prank(alice);
+        positions.close(id);
+
+        (uint256 owed0, uint256 owed1) = positions.feesOwed(id);
+        assertEq(owed0 + owed1, 0, "a closed position owes nothing");
+    }
+
+    function test_feesOwed_revertsForUnknownId() public {
+        vm.expectRevert(BarkerV4Positions.UnknownPosition.selector);
+        positions.feesOwed(999);
+    }
+
     // ------------------------------------------------------------ pausing
 
     /// @notice Pausing stops new risk from being opened but must never trap existing capital.

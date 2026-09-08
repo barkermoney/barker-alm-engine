@@ -9,6 +9,8 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
+import {FullMath} from "v4-core/src/libraries/FullMath.sol";
+import {FixedPoint128} from "v4-core/src/libraries/FixedPoint128.sol";
 
 interface IERC20Minimal {
     function transferFrom(address from, address to, uint256 value) external returns (bool);
@@ -151,12 +153,32 @@ contract BarkerV4Positions is IUnlockCallback {
         return p;
     }
 
-    /// @notice Uncollected fees owed to a position, as of now.
+    /// @notice Uncollected fees owed to a position, in token amounts, as of now.
+    ///
+    /// @dev The obvious implementation — returning `getFeeGrowthInside` — is wrong, and wrong in a
+    ///      way that type-checks and looks plausible in a block explorer. Fee *growth* is a Q128
+    ///      per-unit-of-liquidity accumulator; fee *owed* is
+    ///      `liquidity * (growthInside - growthInsideLast) / 2**128`. The two differ by ~38 orders
+    ///      of magnitude, so a caller that mistakes one for the other does not get a rounding error,
+    ///      it gets a number with no relationship to anything. This is the single sharpest edge we
+    ///      hit reading v4 state off-chain; see `FEEDBACK.md` §14.
+    ///
+    ///      The wrapping subtraction is intentional and matches `Pool.update` — both accumulators
+    ///      are allowed to overflow, and only the difference is meaningful.
     function feesOwed(uint256 positionId) external view returns (uint256 fee0, uint256 fee1) {
         Position memory p = _positions[positionId];
         if (p.owner == address(0)) revert UnknownPosition();
         if (p.closed) return (0, 0);
-        (fee0, fee1) = poolManager.getFeeGrowthInside(p.key.toId(), p.tickLower, p.tickUpper);
+
+        PoolId id = p.key.toId();
+        (uint256 inside0, uint256 inside1) = poolManager.getFeeGrowthInside(id, p.tickLower, p.tickUpper);
+        (uint128 liquidity, uint256 inside0Last, uint256 inside1Last) =
+            poolManager.getPositionInfo(id, address(this), p.tickLower, p.tickUpper, saltFor(positionId));
+
+        unchecked {
+            fee0 = FullMath.mulDiv(inside0 - inside0Last, liquidity, FixedPoint128.Q128);
+            fee1 = FullMath.mulDiv(inside1 - inside1Last, liquidity, FixedPoint128.Q128);
+        }
     }
 
     /// @dev Salt is derived from the position id so two positions sharing a range stay distinct
