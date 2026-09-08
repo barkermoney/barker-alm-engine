@@ -1,0 +1,24 @@
+{
+  "name": "@barker/alm-keeper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event indexer and unattended keeper for Barker one-sided v4 positions on Arc",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "index": "tsx src/cli.ts index",
+    "status": "tsx src/cli.ts status",
+    "once": "tsx src/cli.ts once",
+    "run": "tsx src/cli.ts run",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
