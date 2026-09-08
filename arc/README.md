@@ -33,6 +33,12 @@ forge test
 
 Tests deploy a real `PoolManager` and mock ERC-20s. They deliberately do **not** touch Arc's USDC, which is a native precompile that Foundry does not implement — those paths are exercised on-chain with `cast`. See `docs/environment.md`.
 
+## Automation
+
+The off-chain half lives in [`../keeper/`](../keeper/): a v4 event indexer and an unattended keeper
+that closes a ladder once it has fully converted. It closed position #2 on Arc testnet on its own on
+Sep 8, 2026, on a key that is not the position owner's — see [`DEPLOYMENTS.md`](DEPLOYMENTS.md).
+
 ## Deploying to Arc
 
 The split is load-bearing, not stylistic: **Foundry computes, `cast` transacts.**
