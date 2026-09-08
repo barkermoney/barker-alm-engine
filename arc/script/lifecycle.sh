@@ -44,15 +44,18 @@ HOOK="${HOOK:-}"
 
 # --- pool + position parameters (from script/Params.s.sol) ---------------------------------------
 # 1 BPROBE = 0.0001 USDC.  currency0 = BPROBE (lower address), currency1 = USDC.
+# Defaults reproduce the Sep 4 run. Every one of them is overridable, because a second lifecycle
+# has to be openable against a pool whose price has since moved — see `keeper/README.md`.
 DYNAMIC_FEE=8388608          # 0x800000, the dynamic-fee sentinel
 TICK_SPACING=60
-INIT_SQRT_PRICE=791174656804618572554   # tick -368460
-TICK_LOWER=-368100                      # +3.7% above spot
-TICK_UPPER=-367500                      # +9.9% above spot
-LIQUIDITY=6880784485432867              # ~20,000 BPROBE, one-sided
-SWAP_LIMIT=835070413329746806640        # tick -367380, just past the range
-SWAP_AMOUNT=-2500000                    # exactIn 2.5 USDC; the limit stops it at the range top
+INIT_SQRT_PRICE="${INIT_SQRT_PRICE:-791174656804618572554}"   # tick -368460
+TICK_LOWER="${TICK_LOWER:--368100}"                # +3.7% above spot
+TICK_UPPER="${TICK_UPPER:--367500}"                # +9.9% above spot
+LIQUIDITY="${LIQUIDITY:-6880784485432867}"         # ~20,000 BPROBE, one-sided
+SWAP_LIMIT="${SWAP_LIMIT:-835070413329746806640}"  # tick -367380, just past the range
+SWAP_AMOUNT="${SWAP_AMOUNT:--2500000}"             # exactIn 2.5 USDC; the limit stops it at the range top
 POSITION_ID="${POSITION_ID:-1}"
+KEEPER="${KEEPER:-}"
 
 need() { [ -n "${!1:-}" ] || { echo "error: $1 is not set. Run deploy first, or export it." >&2; exit 1; }; }
 
@@ -166,6 +169,25 @@ close)
   # crossing this returns USDC and zero BPROBE.
   need POSITIONS
   send "$POSITIONS" 'close(uint256)' "$POSITION_ID"
+  ;;
+
+set-keeper)
+  # Authorise (or revoke, with ALLOW=false) a keeper on the registry. Governance only.
+  #
+  # The keeper is deliberately a *different* address from the position owner. `close` and `collect`
+  # always pay the position's own owner and take no recipient argument, so the blast radius of a
+  # stolen keeper key is "positions get closed early into their owners' wallets" — but that is only
+  # a real property if the automation is actually running on its own key rather than on the
+  # owner's. Sharing one key would give the identical demo and none of the security.
+  need POSITIONS; need KEEPER
+  send "$POSITIONS" 'setKeeper(address,bool)' "$KEEPER" "${ALLOW:-true}"
+  ;;
+
+fund-keeper)
+  # Arc gas is USDC, so a keeper with no USDC is a keeper that cannot close anything. Native
+  # transfer, 18 decimals.
+  need KEEPER
+  send "$KEEPER" --value "${FUND_WEI:-1000000000000000000}"
   ;;
 
 *)
