@@ -49,13 +49,27 @@ becomes a much cheaper choice about how much dashboard to build.
 | **D3 — Sep 6** | `IMakerHooks` settlement: redeem-on-fill, redeposit-on-receive, `steakUSDC` wired as the backing vault. | **done Sep 7** (a day late, absorbed by the banked slack) — `YieldBackedSettlement.sol`, real signed fills through an unmodified router, 9 tests |
 | **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | **done Sep 7** — both directions against live steakUSDC on a mainnet fork incl. a round trip, buffer ratio in settlement, 4 fork tests; suite total 40 green. Check-in #1 submitted. |
 | **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | **done Sep 8** — position #2 closed unattended on Arc testnet by a keeper on its own key ([`keeper/`](../keeper/), 15 tests); indexer rebuilds both positions and 19 pools from events; two real bugs found and one fixed |
-| **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | Dashboard shows live testnet positions and the Aqua maker |
+| **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | **done Sep 10**, a day late (no build session ran on Sep 9) — [`app/`](../app/): live Arc positions and fees through the keeper's own indexer, live steakUSDC, the guard's effect on a quote, a recorded fork run. Building it surfaced two real errors, below |
 | **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | Whatever is behind gets this day |
 | **D8 — Sep 11** | README, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, video script and rehearsal. | Everything written except the recording |
 | **D9 — Sep 12** | Record the demo video. Submit on the dashboard. | Submitted — **not** left for the morning of the 13th |
 
 Two full days of buffer at the end. For a solo run that is the right shape; the failure mode of a
 nine-day sprint is not running out of ideas, it is running out of Sunday.
+
+### Sep 10 — what building the dashboard found
+
+Drawing the data rather than asserting on it found two errors that every test had passed:
+
+- **The solvency guard moved the price, not the depth.** It capped `balanceOut` and left
+  `balanceIn` alone, so the moment it engaged a stable pair quoted USDC at a twentieth of its value.
+  Fixed (both reserves scaled by the same factor) and pinned from three sides; 44 aqua tests green.
+  See [`../aqua/README.md`](../aqua/README.md) and [`../FEEDBACK-1INCH.md`](../FEEDBACK-1INCH.md) §7.
+- **`FEEDBACK.md` §8 — our headline item for Uniswap — was false.** v4's `Swap` event *does* carry
+  the overridden fee; our own Sep 8 swap shows `fee = 24600`. Retracted publicly, as §13 was.
+
+Also: publicnode began refusing fork reads without a token on Sep 10; fork suites now point at
+`eth.drpc.org`.
 
 ### Sep 5 — one finding that changes D3's premise
 
@@ -136,7 +150,8 @@ prize submission.
    and tested. Both are defensible; drifting into the second by not deciding is not.
 
 1. **How much dashboard.** The honest floor is a page that lists positions and their state. Anything
-   past that is presentation, and presentation is what gets cut first.
+   past that is presentation, and presentation is what gets cut first. *Settled by events: one
+   screen shipped Sep 10 covering both legs; no further dashboard scope planned.*
 2. **Whether to attempt the custom SwapVM opcode variant.** 1inch explicitly permits redeploying a
    modified SwapVM, and doing so is a differentiator rather than a requirement — the official
    extension points (`Extruction`, `IMakerHooks`) already satisfy the brief. Attempt it only if D7

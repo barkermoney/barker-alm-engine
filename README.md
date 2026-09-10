@@ -21,6 +21,7 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Arc leg | deployed to Arc testnet; two full lifecycles verified on chain, the second **closed unattended by the keeper** ([tx list](arc/DEPLOYMENTS.md)) |
 | Aqua leg | solvency guard and settlement live on an Ethereum mainnet fork against real steakUSDC ([details](aqua/README.md)) |
 | Automation | [`keeper/`](keeper/) — v4 event indexer and unattended keeper; closed Arc testnet position #2 on its own, Sep 8 |
+| Dashboard | [`app/`](app/) — one screen over both legs: live Arc testnet positions and fees, live steakUSDC, the guard's effect on a quote, and a recorded fork run. `cd app && npm install && npm run dev` |
 
 ---
 
@@ -65,6 +66,9 @@ Uniswap v4 is not a bolt-on here — the one-sided concentrated liquidity positi
 | Strategy program placing the guard between reserves and curve | [`aqua/test/SolvencyGuardOnSwapVM.t.sol`](aqua/test/SolvencyGuardOnSwapVM.t.sol), `_order()` |
 | Guard running inside an unmodified `SwapVMRouter` | same file |
 | Live steakUSDC on an Ethereum mainnet fork | [`aqua/test/SolvencyGuardMainnetFork.t.sol`](aqua/test/SolvencyGuardMainnetFork.t.sol) |
+| Price-preserving cap — the guard scales `balanceIn` with `balanceOut` so it trims depth, not price (fixed Sep 10) | [`aqua/src/YieldBackedSolvencyGuard.sol`](aqua/src/YieldBackedSolvencyGuard.sol), `extruction()`; pinned by `test_guardKeepsThePriceAndTrimsOnlyTheDepth` |
+| Settlement hooks — redeem-on-fill, redeposit-on-receive | [`aqua/src/YieldBackedSettlement.sol`](aqua/src/YieldBackedSettlement.sol) |
+| One recorded end-to-end run, shown on the dashboard | [`aqua/test/YieldBackedSettlementMainnetFork.t.sol`](aqua/test/YieldBackedSettlementMainnetFork.t.sol), `test_recordDashboardTrace` → [`app/public/aqua-fork-trace.json`](app/public/aqua-fork-trace.json) |
 
 No upstream source is modified — SwapVM is consumed as a dependency and extended through its own published extension point. What the guard buys is that a maker whose capital is earning yield in an ERC-4626 vault can quote against the *vault position* rather than against fictional reserves, so it never quotes a fill it cannot settle. See [`aqua/README.md`](aqua/README.md).
 
@@ -95,7 +99,7 @@ This project was built with AI assistance (Claude Code). [`AI-DISCLOSURE.md`](AI
 arc/           Arc leg — Uniswap v4 hook + one-sided CL manager (MIT)
 aqua/          Aqua leg — SwapVM extensions, ERC-4626 backed maker (SwapVM-1.1)
 keeper/        v4 event indexer + unattended position keeper (MIT)
-app/           Minimal multi-position dashboard (MIT)
+app/           Dashboard over both legs — live Arc, recorded fork run (MIT)
 docs/          Architecture, schedule, specs
 research/      Pre-hackathon feasibility probe (documented, not a submission artifact)
 FEEDBACK.md    Uniswap v4 integration experience — the good, the sharp edges
