@@ -64,6 +64,18 @@ Not a complaint — it is the right behaviour, and it gives yield-backed makers 
 
 ---
 
+## Sep 10, 2026 — building the dashboard over the guard
+
+### 7. `balanceIn` and `balanceOut` are two registers but one price, and an `Extruction` can split them silently
+
+Our guard shipped on Sep 5 rewriting `balanceOut` down to what the maker could deliver and leaving `balanceIn` alone. It passed 40 tests, including the mainnet fork. It was also wrong in the way that matters most to a market maker: `XYCSwap`'s marginal price is `balanceOut / balanceIn`, so trimming one register moved the **price**, not the depth. A maker backing 500k USDC behind 10M virtual reserves quoted 12,195 USDC for 250,000 USDT the moment the guard engaged.
+
+We found it by drawing the depth curve for the dashboard, not by testing. Every test asserted the cap and the settleability, and the "expected" value in the headline test was computed from the same one-sided formula as the contract — the test and the bug agreed with each other.
+
+The fix is to scale `balanceIn` by the same factor (rounded up, toward the maker). The DX point for SwapVM: `SwapRegisters` presents the two balances as independent fields, and nothing in the `Extruction` documentation says that, for every curve in the instruction set, they are one quantity — a price — expressed as two numbers. An `Extruction` is exactly the place a third party rewrites them. A sentence in the docs ("if you change one balance register, you are changing the price unless you scale the other") or a small `SwapRegistersLib.scaleBalances(num, den)` helper would have saved us, and will save the next person writing a risk or inventory extruction.
+
+---
+
 ## Summary for 1inch
 
 The extension points are the right ones and we did not need to fork. Our whole build sits in two contracts hanging off `Extruction` and `IMakerHooks`.
@@ -74,3 +86,4 @@ Ranked by what we would fix first:
 2. **Document the one-function `Extruction` form** — §2. The design is better than the docs claim; say so.
 3. **Say where the capital lives when describing the two tracks** — §5. It decides which makers are possible.
 4. **Name the `StaticBalances` arguments by token order** — §3. Silent wrong-price on a mistake that is invisible under symmetric reserves.
+5. **Say that the two balance registers are one price** — §7. The natural first `Extruction` anyone writes rewrites one of them.

@@ -21,7 +21,9 @@ Together they close the loop: the guard makes the *quote* honest, settlement mak
 
 ## How the guard works
 
-The cap lands on `balanceOut` — the reserve the pricing curve runs on — **before** the curve is evaluated, not on the amount that comes out of it. So the quote stays *on* the curve: depth shrinks, price walks up the same shape, and every quote the strategy can emit is one the maker can settle.
+The cap lands on `balanceOut` — the reserve the pricing curve runs on — **before** the curve is evaluated, not on the amount that comes out of it, and `balanceIn` is scaled down by the same factor. Curves price off the reserve *ratio*, so keeping the ratio keeps the price: a small fill quotes the same rate with or without the guard, depth shrinks, price walks up the same shape sooner, and every quote the strategy can emit is one the maker can settle.
+
+> **Corrected Sep 10.** The first version capped `balanceOut` alone. That kept every quote settleable but moved the price: on the mainnet fork a maker backing 500k USDC behind 10M virtual reserves quoted **12,195 USDC for 250,000 USDT** — USDC at a twentieth of its value — the instant the guard engaged. All 40 tests passed, because each one checked the cap and none checked the price; the headline assertion compared the guarded quote against the same broken formula. Now pinned from three sides: a unit test on the scaled registers, a fuzz test that the reserve ratio moves by at most one unit of rounding and only in the maker's favour, and `test_guardKeepsThePriceAndTrimsOnlyTheDepth` through the real router. The same fork scenario now quotes **166,667 USDC** for 250,000 USDT — a 500k-deep book taking a half-book fill.
 
 Placement in the strategy program is load-bearing:
 
@@ -93,7 +95,9 @@ The compiler profile (solc 0.8.30, `via_ir`, `optimizer_runs = 700`) matches ups
 The fork suite skips rather than fails when `ETHEREUM_RPC_URL` is unset, so an offline run stays green and honest about what it did not check.
 
 ```bash
-ETHEREUM_RPC_URL=https://ethereum-rpc.publicnode.com forge test
+ETHEREUM_RPC_URL=https://eth.drpc.org forge test
 ```
+
+Any mainnet RPC works if it serves state at a block a few seconds old. As of Sep 10 publicnode no longer does without a personal token — it answers `Archive requests require a personal token` and the fork suites fail in `setUp`. `eth.drpc.org`, `rpc.flashbots.net` and `eth-mainnet.public.blastapi.io` were verified on that date.
 
 **On the fork suite and the canonical address:** SwapVM's README points integrators at `0x111111338c5091E8440b67B168bAe16a668AC0De`. That deployment is live on mainnet but predates the current repository — the `quote` selector generated from HEAD is absent from its bytecode. The suite therefore deploys the router from unmodified upstream source and keeps everything else on the fork real. `test_canonicalDeploymentHasDriftedFromHead` pins the drift down so a future redeploy turns it green.

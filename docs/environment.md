@@ -39,7 +39,7 @@ This is not a preference. It is the difference between a transaction that happen
 
 | | |
 |---|---|
-| RPC | `https://ethereum-rpc.publicnode.com` |
+| RPC | `https://eth.drpc.org` (publicnode, used until Sep 9, began refusing fork-style reads without a personal token on Sep 10) |
 | Verified at | block 25,908,224 |
 | Fork tool | `anvil --fork-url $ETH_RPC_URL --fork-block-number <pinned>` |
 
