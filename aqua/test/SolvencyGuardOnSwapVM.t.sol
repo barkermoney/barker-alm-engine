@@ -8,6 +8,7 @@ pragma solidity 0.8.30;
 import { Test } from "forge-std/Test.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { ISwapVM } from "swap-vm/src/interfaces/ISwapVM.sol";
 import { SwapVMRouter } from "swap-vm/src/routers/SwapVMRouter.sol";
@@ -148,9 +149,12 @@ contract SolvencyGuardOnSwapVMTest is Test {
         vm.stopPrank();
     }
 
-    /// @dev Constant product, the same arithmetic the `XYCSwap` opcode performs.
+    /// @dev Constant product, the same arithmetic the `XYCSwap` opcode performs, on the reserves the
+    ///   guard hands it: when the outbound reserve is capped, the inbound one is scaled by the same
+    ///   factor (rounded up), so the ratio — the price — survives the cap.
     function _xyc(uint256 reserveOut, uint256 amountIn) internal pure returns (uint256) {
-        return reserveOut * amountIn / (RESERVE_IN + amountIn);
+        uint256 reserveIn = Math.mulDiv(RESERVE_IN, reserveOut, RESERVE_OUT, Math.Rounding.Ceil);
+        return reserveOut * amountIn / (reserveIn + amountIn);
     }
 
     // ---------------------------------------------------------------------
@@ -170,6 +174,30 @@ contract SolvencyGuardOnSwapVMTest is Test {
 
         assertLt(guarded, unguarded, "the guard must cost depth, that is the point");
         assertLe(guarded, backing, "and never quote beyond what can be redeemed");
+    }
+
+    /// @notice The guard trims depth, not price: a small fill quotes the same rate either way.
+    /// @dev Added Sep 10. The first version of the guard capped `balanceOut` alone, which moved the
+    ///   curve's marginal price from 1.0 to backing / virtual reserve — here 0.2 — the instant it
+    ///   engaged. The headline test above still passed, because it compared the guarded quote to
+    ///   the same broken formula and only ever asked whether the guard *cost* depth.
+    function test_guardKeepsThePriceAndTrimsOnlyTheDepth() public {
+        _fundVault(200_000e6);
+
+        uint256 small = 10e6;
+        (, uint256 unguardedSmall,) = router.quote(_order(false), small, _takerData(true));
+        (, uint256 guardedSmall,) = router.quote(_order(true), small, _takerData(true));
+
+        // 10 USDT against a 200k-deep book: the only difference is the extra slippage of a
+        // shallower curve, well under a basis point.
+        assertApproxEqRel(guardedSmall, unguardedSmall, 1e14, "same price at the margin");
+        assertGt(guardedSmall, small * 9_990 / 10_000, "a stable pair still quotes near 1:1");
+
+        // The large fill is where the depth difference belongs.
+        (, uint256 unguardedLarge,) = router.quote(_order(false), SWAP_IN, _takerData(true));
+        (, uint256 guardedLarge,) = router.quote(_order(true), SWAP_IN, _takerData(true));
+        assertLt(guardedLarge, unguardedLarge, "the guard costs depth on size");
+        assertGt(guardedLarge, SWAP_IN * 6 / 10, "but a half-book fill still clears at a usable price");
     }
 
     /// @notice Without the guard the strategy quotes a fill it cannot settle. With it, it does not.

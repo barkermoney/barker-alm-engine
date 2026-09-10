@@ -186,7 +186,9 @@ contract SolvencyGuardMainnetForkTest is Test {
     }
 
     function _xyc(uint256 reserveOut, uint256 amountIn) internal pure returns (uint256) {
-        return reserveOut * amountIn / (RESERVE + amountIn);
+        // Reserves are symmetric, so the guard's proportional scaling of the inbound side lands it
+        // on exactly the capped outbound figure.
+        return reserveOut * amountIn / (reserveOut + amountIn);
     }
 
     // ---------------------------------------------------------------------

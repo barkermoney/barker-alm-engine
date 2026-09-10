@@ -154,7 +154,7 @@ contract YieldBackedSolvencyGuardTest is Test {
         assertEq(updated.balanceOut, 5_000e6, "a USDT vault cannot settle a USDC leg");
     }
 
-    function test_registersOtherThanBalanceOutAreLeftAlone() public {
+    function test_takerAmountsAndControlFlowAreLeftAlone() public {
         _fundVault(10_000e6);
         _approveRouter(type(uint256).max);
 
@@ -164,10 +164,61 @@ contract YieldBackedSolvencyGuardTest is Test {
         (uint256 nextPC, uint256 chopped, SwapRegisters memory updated) =
             _run(_query(true), incoming, _args(address(vault)));
 
-        assertEq(updated.balanceIn, 777e6, "inbound reserve untouched");
         assertEq(updated.amountIn, 55e6, "taker-specified amount untouched");
         assertEq(nextPC, 7, "the guard does not branch");
         assertEq(chopped, 0, "the guard consumes no taker arguments");
+    }
+
+    // ---------------------------------------------------------------------
+    // price preservation — added Sep 10
+    //
+    // The first version capped balanceOut alone and asserted that balanceIn was "untouched". On
+    // the mainnet fork that turned a 1:1 stable quote into 0.05: a maker backing 500k against
+    // 10M virtual reserves priced USDC at a twentieth of its value the moment the guard engaged.
+    // Every test passed, because every test checked the cap and none checked the price.
+    // ---------------------------------------------------------------------
+
+    function test_capScalesTheInboundReserveBySameFactor() public {
+        _fundVault(10_000e6);
+        _approveRouter(type(uint256).max);
+
+        SwapRegisters memory incoming =
+            SwapRegisters({ balanceIn: 2 * VIRTUAL_RESERVE, balanceOut: VIRTUAL_RESERVE, amountIn: 0, amountOut: 0 });
+
+        (,, SwapRegisters memory updated) = _run(_query(true), incoming, _args(address(vault)));
+
+        assertEq(updated.balanceOut, 10_000e6, "outbound reserve capped");
+        assertEq(updated.balanceIn, 20_000e6, "inbound reserve scaled with it, ratio 2:1 kept");
+    }
+
+    function test_uncappedReservesAreLeftExactlyAsShipped() public {
+        _fundVault(900_000e6);
+        _approveRouter(type(uint256).max);
+
+        SwapRegisters memory incoming =
+            SwapRegisters({ balanceIn: 777e6, balanceOut: 25_000e6, amountIn: 55e6, amountOut: 0 });
+
+        (,, SwapRegisters memory updated) = _run(_query(true), incoming, _args(address(vault)));
+
+        assertEq(updated.balanceIn, 777e6, "nothing to scale when the guard does not bind");
+        assertEq(updated.balanceOut, 25_000e6);
+    }
+
+    /// @notice The marginal price is balanceOut / balanceIn. After the cap it may only move by the
+    ///   rounding of one division, and only in the maker's favour.
+    function testFuzz_capPreservesTheMarginalPrice(uint96 reserveIn, uint96 reserveOut, uint96 backing) public {
+        vm.assume(reserveIn > 1e6 && reserveOut > 1e6 && backing > 0 && backing < reserveOut);
+        _fundVault(backing);
+        _approveRouter(type(uint256).max);
+
+        SwapRegisters memory incoming =
+            SwapRegisters({ balanceIn: reserveIn, balanceOut: reserveOut, amountIn: 0, amountOut: 0 });
+        (,, SwapRegisters memory updated) = _run(_query(true), incoming, _args(address(vault)));
+
+        // out'/in' <= out/in, i.e. the taker never gets a better price than the strategy shipped…
+        assertLe(updated.balanceOut * uint256(reserveIn), uint256(reserveOut) * updated.balanceIn, "never better for the taker");
+        // …and never worse than one unit of inbound rounding.
+        assertGe(updated.balanceOut * uint256(reserveIn), uint256(reserveOut) * (updated.balanceIn - 1), "within one unit");
     }
 
     // ---------------------------------------------------------------------

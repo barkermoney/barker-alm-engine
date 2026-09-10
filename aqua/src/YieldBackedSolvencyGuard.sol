@@ -9,6 +9,7 @@ pragma solidity 0.8.30;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { IStaticExtruction } from "swap-vm/src/instructions/Extruction.sol";
 import { SwapQuery, SwapRegisters } from "swap-vm/src/libs/VM.sol";
@@ -23,10 +24,11 @@ import { SwapQuery, SwapRegisters } from "swap-vm/src/libs/VM.sol";
 /// transfer time, and the maker looks like it is quoting in bad faith.
 ///
 /// This guard closes that gap by rewriting `balanceOut` — the reserve the pricing curve runs on —
-/// down to `min(virtual reserve, liquid + redeemable, allowance)` before the curve is evaluated.
-/// Because the cap lands on the reserve rather than on the resulting amount, the quote stays *on*
-/// the curve: depth shrinks, price walks up the same shape, and every quote the strategy can emit
-/// is one the maker can settle.
+/// down to `min(virtual reserve, liquid + redeemable, allowance)` before the curve is evaluated,
+/// and scaling `balanceIn` by the same factor. Because the cap lands on the reserves rather than
+/// on the resulting amount, and preserves their ratio, the quote stays *on* the curve: the price
+/// at the margin is unchanged, depth shrinks, price walks up the same shape sooner, and every
+/// quote the strategy can emit is one the maker can settle.
 ///
 /// @dev Placement matters. This must run **after** the reserves are set (`AQUA`, `StaticBalances`
 ///   or `DynamicBalances`) and **before** the swap math (`XYCSwap`, `XYCConcentrateSwap`,
@@ -84,6 +86,13 @@ contract YieldBackedSolvencyGuard is IStaticExtruction {
         // Only ever downward. A guard that could raise the reserve would be a way to quote depth
         // the strategy never authorised.
         if (updatedSwap.balanceOut > deliverable) {
+            // Scale the inbound reserve by the same factor, or the cap moves the price instead of
+            // the depth. Every curve this guard sits in front of prices off the reserve *ratio* —
+            // `XYCSwap`'s marginal price is balanceOut / balanceIn — so trimming only balanceOut
+            // hands the taker a different curve: a maker backing 500k against 10M virtual reserves
+            // would quote USDC at 0.05 per USDT, which no taker fills and no maker meant.
+            // Rounded up, which errs toward the maker, as SwapVM's own curves do.
+            updatedSwap.balanceIn = Math.mulDiv(swap.balanceIn, deliverable, swap.balanceOut, Math.Rounding.Ceil);
             updatedSwap.balanceOut = deliverable;
         }
 
