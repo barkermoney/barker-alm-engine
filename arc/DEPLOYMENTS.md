@@ -135,8 +135,9 @@ see [`../FEEDBACK.md`](../FEEDBACK.md) §16 for the retraction.
 
 So the +4.07% is not evidence the ladder works better than the math says. It is fee revenue the
 position charged because of a defect in our own hook, and on a real pool a 2.46% quote would simply
-have driven the trade elsewhere. The behaviour is pinned by `test_KNOWN_DEFECT_*` in
-[`test/BarkerDynamicFeeHook.t.sol`](test/BarkerDynamicFeeHook.t.sol), written up in
+have driven the trade elsewhere. On this branch the incident is replayed on the deployed parameters
+by `test_moveFromLongAgo_isNotCharged_sep8Replay` in
+[`test/BarkerDynamicFeeHook.t.sol`](test/BarkerDynamicFeeHook.t.sol); it is written up in
 [`../FEEDBACK.md`](../FEEDBACK.md) §16, and **not fixed in the deployed hook** — a hook's permission
 bits live in its address, so a corrected hook is a new address, a new `PoolKey`, and a new pool. The
 fix itself (date the move to `lastBlock` and decay it with the stored surge) is on branch
