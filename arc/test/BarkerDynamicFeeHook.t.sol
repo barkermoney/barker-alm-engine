@@ -167,73 +167,90 @@ contract BarkerDynamicFeeHookTest is Base {
         assertEq(feeCold, BASE_FEE);
     }
 
-    /// @notice 🔴 KNOWN DEFECT, pinned deliberately: a price move is charged at full rate no matter
-    ///         how long it took. Stored surge decays with elapsed blocks; the *new* contribution
-    ///         does not, so drift accumulated over days is billed as though it happened in a block.
-    ///
-    /// @dev This is not a hypothetical. On Arc testnet on Sep 8 the deployed hook charged **2.46%**
-    ///      (`FeeApplied(fee=24600, surge=21600, tickMove=1080)`) to the first swap in four days,
-    ///      purely because the previous observation was four days old. See `FEEDBACK.md` §16 and
-    ///      `DEPLOYMENTS.md`.
-    ///
-    ///      The test asserts the behaviour as it currently is rather than as it should be, so that
-    ///      the intended fix — treat an observation older than `decayBlocks` as no observation,
-    ///      re-baseline, and charge the base fee — turns this test red on purpose when it lands.
-    function test_KNOWN_DEFECT_staleObservationIsChargedAsIfInstant() public {
-        // Establish an observation, then move the price a long way.
+    /// @notice Regression for the Sep 8 incident, replayed on the parameters deployed to Arc
+    ///         testnet: a swap's price impact must not be billed to a trader who arrives long after.
+    /// @dev On chain, the Sep 4 lifecycle swap moved the pool 1,080 ticks (−368,460 → −367,380). The
+    ///      next swap on that pool came 588,318 blocks later, and the Sep 4 build charged it
+    ///      `FeeApplied(fee=24600, surge=21600, tickMove=1080)` — the whole move at full rate, because
+    ///      it dated the move to when it was observed rather than when it happened. See
+    ///      `DEPLOYMENTS.md` and `FEEDBACK.md` §16.
+    function test_moveFromLongAgo_isNotCharged_sep8Replay() public {
+        vm.prank(governance);
+        hook.setParameters(3000, 50_000, 20, 300); // as read back from the Arc testnet deployment
+
         vm.prank(alice);
         swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
         vm.prank(bob);
         swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
 
-        // Now let an eternity pass with no trading at all. Any stored surge decays to nothing —
-        // that half of the mechanism works.
-        vm.roll(block.number + DECAY_BLOCKS * 1000);
+        vm.roll(block.number + 588_318);
 
+        assertEq(hook.quoteFee(key), 3000, "quote: nothing recent to charge for");
         (uint24 fee, uint24 surge, int24 move) = _swapAndReadFee(false, -1, 6000);
-
-        assertGt(move, 0, "the tick did move, a very long time ago");
-        assertGt(surge, 0, "and it is charged in full despite the age of the observation");
-        assertEq(fee, BASE_FEE + surge);
-
-        // The precise statement of the bug: elapsed time changed nothing about the charge.
-        // safe: `move` asserted positive above
-        // forge-lint: disable-next-line(unsafe-typecast)
-        assertEq(surge, uint24(uint24(move)) * SURGE_PER_TICK, "no time normalisation is applied");
+        assertGt(move, 0, "the move is still reported");
+        assertEq(surge, 0, "but it is four days old and has fully decayed");
+        assertEq(fee, 3000, "so the trader pays the base fee");
     }
 
-    /// @notice The same movement, charged after one block instead of after an eternity, costs the
-    ///         same. Two tests are needed to state the defect: one shows the charge survives age,
-    ///         this one shows age is not an input at all.
-    function test_KNOWN_DEFECT_ageOfObservationDoesNotChangeTheCharge() public {
-        uint256 snap = vm.snapshotState();
-
+    /// @notice The move decays from the block the previous swap made it, at the same linear rate
+    ///         as stored surge — pinned to the exact formula, not merely "went down".
+    /// @dev Between two `beforeSwap` calls the tick can only have moved by the one swap in
+    ///      between, which ran in `lastBlock`. So after `k` blocks the charge must be
+    ///      `min(stored + |move| * surgePerTick, maxFee) * (decayBlocks - k) / decayBlocks`.
+    function test_moveDecaysFromTheBlockItHappened() public {
         vm.prank(alice);
         swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
+
+        // A big move, observed and charged in the block it happened: the full rate.
         vm.prank(bob);
         swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
-        vm.roll(block.number + 1);
-        (, uint24 surgeFresh,) = _swapAndReadFee(false, -1, 6000);
-
+        uint256 snap = vm.snapshotState();
+        (, uint24 surgeNow,) = _swapAndReadFee(false, -1, 6000);
         vm.revertToState(snap);
 
+        // The same state, the same move, a quarter of the window later.
+        vm.roll(block.number + DECAY_BLOCKS / 4);
+        (, uint24 surgeLater, int24 move) = _swapAndReadFee(false, -1, 6000);
+
+        assertGt(move, 0);
+        assertGt(surgeNow, 0);
+        assertEq(uint256(surgeLater), (uint256(surgeNow) * (DECAY_BLOCKS - DECAY_BLOCKS / 4)) / DECAY_BLOCKS);
+    }
+
+    /// @notice No cliff at the end of the window. The fix first proposed on Sep 8 — re-baseline
+    ///         once an observation is older than `decayBlocks` — would have charged a move in full
+    ///         one block before the window closed and nothing one block after. Decaying the move
+    ///         instead leaves only a sliver in the last block, and nothing after.
+    function test_noCliffAtTheEndOfTheWindow() public {
         vm.prank(alice);
         swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
         vm.prank(bob);
         swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
-        vm.roll(block.number + DECAY_BLOCKS * 1000);
-        (, uint24 surgeStale,) = _swapAndReadFee(false, -1, 6000);
 
-        // Not exactly equal: the fresh case still carries a sliver of the *previous* swap's stored
-        // surge, which one block of decay has barely touched, while the stale case has decayed
-        // that residue to nothing. That residue is the only thing elapsed time affects — the move
-        // itself is billed at full rate in both cases, which is the defect.
-        assertGe(surgeFresh, surgeStale, "the fresh case additionally carries undecayed residue");
-        assertGt(
-            uint256(surgeStale) * 1000,
-            uint256(surgeFresh) * 999,
-            "1000 decay windows of waiting removed under 0.1% of the charge"
-        );
+        uint256 snap = vm.snapshotState();
+        vm.roll(block.number + DECAY_BLOCKS - 1);
+        (, uint24 surgeLast,) = _swapAndReadFee(false, -1, 6000);
+        vm.revertToState(snap);
+        vm.roll(block.number + DECAY_BLOCKS);
+        (, uint24 surgeGone,) = _swapAndReadFee(false, -1, 6000);
+
+        assertGt(surgeLast, 0, "last block of the window: a sliver remains");
+        assertLe(surgeLast, MAX_FEE / DECAY_BLOCKS, "and it is only a sliver: at most 1/decayBlocks of the cap");
+        assertEq(surgeGone, 0, "window closed: nothing remains");
+    }
+
+    /// @notice `quoteFee` agrees with the charge part-way through a decay, not only in the block
+    ///         of the move — the case the Sep 4 build's hand-mirrored quote was never tested on.
+    function test_quoteFeeMatchesAppliedFee_midDecay() public {
+        vm.prank(alice);
+        swapper.swap(key, false, -1e16, TickMath.getSqrtPriceAtTick(6000));
+        vm.prank(bob);
+        swapper.swap(key, false, -5e18, TickMath.getSqrtPriceAtTick(6000));
+        vm.roll(block.number + DECAY_BLOCKS / 3);
+
+        uint24 quoted = hook.quoteFee(key);
+        (uint24 applied,,) = _swapAndReadFee(false, -1e15, 6000);
+        assertEq(quoted, applied);
     }
 
     /// @notice A violent move pins the fee at the ceiling rather than overflowing it.

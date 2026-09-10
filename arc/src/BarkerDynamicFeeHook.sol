@@ -133,20 +133,18 @@ contract BarkerDynamicFeeHook is IHooks {
         return IHooks.afterInitialize.selector;
     }
 
-    /// @dev 🔴 **Known defect, discovered on chain Sep 8 2026 — the decay is time-aware and the
-    ///      measurement is not.** Stored `surge` decays over `decayBlocks`, but the new
-    ///      contribution is `|currentTick - obs.lastTick| * surgePerTick` with no reference to how
-    ///      long that move took. `beforeSwap` fires on swap boundaries, not on a schedule, so on a
-    ///      quiet pool `obs` can be arbitrarily old and slow drift gets billed as a spike. The
-    ///      deployed hook charged 2.46% to the first swap in four days for exactly this reason —
-    ///      `FeeApplied(fee=24600, surge=21600, tickMove=1080)`, see `DEPLOYMENTS.md`.
+    /// @dev What the tick move means. A v4 pool's price is moved only by swaps on that pool, and
+    ///      every swap on a pool with this hook passes through here and rewrites the observation.
+    ///      So `currentTick - obs.lastTick` is not movement over some interval of unknown length —
+    ///      it is exactly the price impact of the *previous* swap, which happened at `obs.lastBlock`.
+    ///      The surge it earns is therefore dated to `obs.lastBlock`, the same block the stored
+    ///      surge is dated to, and the two decay together from there (see `_surgeNow`).
     ///
-    ///      Intended fix: treat an observation older than `decayBlocks` as no observation at all —
-    ///      re-baseline and charge `baseFee`, which is already what the `!obs.initialized` branch
-    ///      below does for an unseen pool. Deliberately **not** applied yet: the hook's address
-    ///      carries its permission bits, so changing it means a new hook address, which means a new
-    ///      `PoolKey`, which means abandoning the pool whose lifecycle this repository documents.
-    ///      Pinned by `test_KNOWN_DEFECT_*` in the test suite and tracked in `FEEDBACK.md` §16.
+    ///      The version deployed to Arc testnet on Sep 4 dated the move to the block it was
+    ///      *observed* instead, so it never decayed: on Sep 8 it billed the Sep 4 swap's own
+    ///      1,080-tick impact to the next trader, four days later, as a 2.46% fee —
+    ///      `FeeApplied(fee=24600, surge=21600, tickMove=1080)`. See `DEPLOYMENTS.md` and
+    ///      `FEEDBACK.md` §16.
     function beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
         external
         onlyPoolManager
@@ -170,18 +168,7 @@ contract BarkerDynamicFeeHook is IHooks {
                 );
         }
 
-        uint24 surge = _decayed(obs.surge, uint32(block.number) - obs.lastBlock);
-
-        int24 move = currentTick - obs.lastTick;
-        uint256 absMove = uint256(int256(move < 0 ? -move : move));
-
-        // Saturating: a large move should pin the fee at maxFee, never wrap around.
-        uint256 added = absMove * surgePerTick;
-        uint256 total = uint256(surge) + added;
-        if (total > maxFee) total = maxFee;
-        // safe: clamped to maxFee, which is itself a uint24
-        // forge-lint: disable-next-line(unsafe-typecast)
-        surge = uint24(total);
+        (uint24 surge, int24 move) = _surgeNow(obs, currentTick);
 
         observations[id] =
             Observation({lastTick: currentTick, lastBlock: uint32(block.number), surge: surge, initialized: true});
@@ -192,6 +179,24 @@ contract BarkerDynamicFeeHook is IHooks {
         emit FeeApplied(id, fee, surge, move);
 
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, fee | LPFeeLibrary.OVERRIDE_FEE_FLAG);
+    }
+
+    /// @notice Surge in effect now, and the tick move it was computed from.
+    /// @dev The previous swap's impact is added to the surge stored at that swap, both dated to
+    ///      `obs.lastBlock`, and the sum decays from there. A move made in this block is charged
+    ///      in full; the same move made `decayBlocks` ago is not charged at all. Shared by
+    ///      `beforeSwap` and `quoteFee` so that the quote cannot drift from the charge.
+    function _surgeNow(Observation memory obs, int24 currentTick) internal view returns (uint24, int24) {
+        int24 move = currentTick - obs.lastTick;
+        uint256 absMove = uint256(int256(move < 0 ? -move : move));
+
+        // Saturating: a large move should pin the fee at maxFee, never wrap around.
+        uint256 total = uint256(obs.surge) + absMove * surgePerTick;
+        if (total > maxFee) total = maxFee;
+
+        // safe: clamped to maxFee, which is itself a uint24
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return (_decayed(uint24(total), uint32(block.number) - obs.lastBlock), move);
     }
 
     /// @notice Surge remaining after linear decay over `decayBlocks`.
@@ -205,24 +210,17 @@ contract BarkerDynamicFeeHook is IHooks {
     }
 
     /// @notice The fee a swap would pay right now, without changing state.
-    /// @dev For quoting and for the dashboard. Mirrors `beforeSwap` exactly; if you change one,
-    ///      change the other.
+    /// @dev For quoting and for the dashboard. Computes the surge through the same `_surgeNow`
+    ///      as `beforeSwap`, so the two can only disagree about the base-fee clamp below.
     function quoteFee(PoolKey calldata key) external view returns (uint24) {
         PoolId id = key.toId();
         Observation memory obs = observations[id];
         if (!obs.initialized) return baseFee;
 
         (, int24 currentTick,,) = poolManager.getSlot0(id);
-        uint24 surge = _decayed(obs.surge, uint32(block.number) - obs.lastBlock);
+        (uint24 surge,) = _surgeNow(obs, currentTick);
 
-        int24 move = currentTick - obs.lastTick;
-        uint256 absMove = uint256(int256(move < 0 ? -move : move));
-        uint256 total = uint256(surge) + absMove * surgePerTick;
-        if (total > maxFee) total = maxFee;
-
-        // safe: clamped to maxFee, which is itself a uint24
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint24 fee = baseFee + uint24(total);
+        uint24 fee = baseFee + surge;
         return fee > maxFee ? maxFee : fee;
     }
 
