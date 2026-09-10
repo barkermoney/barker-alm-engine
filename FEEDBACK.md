@@ -210,25 +210,47 @@ which is the only assertion a wrong-but-consistent implementation cannot satisfy
 this number, everyone derives it from the same two calls, and the intermediate value is one an
 integrator can plausibly mistake for the answer.
 
-#### 16. A surge-fee hook needs the clock on *both* halves — our own design bug
+#### 16. A surge-fee hook must date a move to when it happened — our own design bug, *diagnosis corrected Sep 10*
 
 Found on Sep 8 by our own keeper, on chain, which is the good way to find it. Our dynamic fee hook
 charges `baseFee + surge`, where surge accumulates with `|tick moved since the previous swap|` and
 decays linearly over `decayBlocks`. On a pool whose previous swap was four days earlier, it applied
 **2.46%** (`FeeApplied(fee=24600, surge=21600, tickMove=1080)`) to a routine trade.
 
-The bug is a clean one to name: **the decay is time-aware and the measurement is not.** Stored
-surge decays with elapsed blocks, but the new contribution is `|currentTick - lastTick|` with no
-reference to how long that took, so 1,080 ticks of drift over four days is charged exactly like
-1,080 ticks in one block. Half the mechanism has a clock and the other half does not.
+> **What we originally wrote here, on Sep 8:** that "the decay is time-aware and the measurement is
+> not", that "1,080 ticks of drift over four days is charged exactly like 1,080 ticks in one block",
+> that because `beforeSwap` fires on swap boundaries "any hook state derived from 'since last call'
+> is sampling an interval of unknown length", and that the fix was to treat an observation older
+> than `decayBlocks` as no observation at all.
 
-This is not a v4 defect — v4 gave us exactly the primitive we asked for. It is a warning for anyone
-writing their first volatility-responsive hook, and it is the kind of thing a "common hook
-pitfalls" page in the docs would have caught before it reached a chain. `beforeSwap` fires on swap
-boundaries, not on a schedule, so *any* hook state derived from "since last call" is sampling an
-interval of unknown length. The fix we intend is to treat an observation older than `decayBlocks` as
-no observation at all — re-baseline and charge the base fee — which is what the hook already does
-for a pool it has never seen.
+**There was no drift.** A v4 pool's price is moved only by swaps on that pool, and every swap on a
+pool with our hook passes through `beforeSwap`, which rewrites the observation. So
+`currentTick − lastTick` is never movement over an interval of unknown length: it is **exactly the
+price impact of the previous swap**. Our own indexer's event log shows it — the pool has two swaps.
+The Sep 4 lifecycle swap (block 60,522,820) took the tick from −368,460 to −367,380; the Sep 8 swap
+(block 61,111,138) started at −367,380 and was charged for −367,380 − (−368,460) = **1,080 ticks**.
+Nothing moved in the four days between. The hook billed one trader for another trader's price
+impact, 588,318 blocks after it happened.
+
+So the defect is narrower than we said, and the fix is different. The move happened in
+`lastBlock` — the same block the stored surge is dated to — so both belong on the same clock:
+`surge = decay(min(stored + |move| × surgePerTick, maxFee), block − lastBlock)`. That is a
+reordering, not a new mechanism. The re-baseline fix we proposed would have been worse: it charges
+a move in full one block before the window closes and nothing one block after. The corrected hook
+is on branch [`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock),
+with a replay of the Sep 8 incident on the deployed parameters as a regression test; it is **not
+deployed** — see [`docs/schedule.md`](docs/schedule.md), decision 0.
+
+**How the error happened.** "The previous observation is four days old" slid into "the price
+drifted for four days" without our asking what could have moved the price in between. On a v4 pool
+with a swap hook the answer is *nothing but the swaps the hook already saw*. Same lesson as §8 and
+§13: the event log answered the question the moment we asked it.
+
+**The DX point, which is better than the one we first made.** A hook with `BEFORE_SWAP` gets
+something unusual and valuable: between two of its calls, the pool's price has moved by exactly one
+swap, at a known block. Volatility measured this way is exact, not sampled. A "hook patterns" page
+could say so in one sentence — and add the corollary that bit us: the move you measure in
+`beforeSwap` belongs to the *previous* swap, and should be dated to it.
 
 ---
 

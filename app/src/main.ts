@@ -71,7 +71,7 @@ function renderArc(s: ArcState): void {
               <td>${f.tickMove === undefined ? "—" : num(f.tickMove, 0)}</td></tr>`,
           )
           .join("")}</tbody></table>
-      ${surged ? `<p class="note">A surge on the first swap after four quiet days is our hook's known defect, not volatility: it measures price drift without normalising for elapsed time. Documented, tested and reported in <a href="https://github.com/barkermoney/barker-alm-engine/blob/main/FEEDBACK.md" target="_blank" rel="noopener">FEEDBACK.md §16</a>.</p>` : ""}`
+      ${surged ? `<p class="note">The 2.46% on the Sep 8 swap is our hook's known defect, not volatility: it billed that trader for the previous swap's price impact, made four days earlier, without decaying it. Documented, tested and reported in <a href="https://github.com/barkermoney/barker-alm-engine/blob/main/FEEDBACK.md" target="_blank" rel="noopener">FEEDBACK.md §16</a>.</p>` : ""}`
     : `<p class="empty">No swaps through the hook yet.</p>`;
 
   $("#arc-updated").textContent = s.lastUpdate ? `updated ${ago(s.lastUpdate)} · refreshes every 5s` : "";

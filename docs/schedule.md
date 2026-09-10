@@ -141,13 +141,22 @@ prize submission.
 **What now gets decided on Sep 10, in this order:**
 
 0. **Whether to redeploy the dynamic fee hook.** Added Sep 8, and it outranks the rest because it
-   is the only item with a consequence that cannot be undone later. The hook bills price drift
-   without normalising for elapsed time, and charged 2.46% to a routine swap on Arc testnet
-   (`FEEDBACK.md` §16). The fix is four lines. The cost is not: a hook's permission bits live in its
-   address, so a corrected hook is a new address, a new `PoolKey`, and a new pool — which abandons
-   the pool whose two documented lifecycles are the Arc leg's on-chain evidence. Either we redeploy
-   *and* re-run both lifecycles to keep the evidence intact, or we ship the known defect documented
-   and tested. Both are defensible; drifting into the second by not deciding is not.
+   is the only item with a consequence that cannot be undone later. The hook charged 2.46% to a
+   routine swap on Arc testnet by billing it for the *previous* swap's price impact, made four days
+   earlier, at full rate (`FEEDBACK.md` §16 — the Sep 8 diagnosis of "drift without time
+   normalisation" was wrong and has been retracted). **The fix is written, tested and pushed on
+   branch [`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock)**
+   (Sep 10; a replay of the Sep 8 incident is its regression test) **and deliberately not merged or
+   deployed.** A hook's permission bits live in its address, so a corrected hook is a new address,
+   a new `PoolKey` and a new pool. The Sep 4 pool and both its lifecycles stay on chain and stay
+   verifiable either way — redeploying adds evidence, it does not erase any. The branch merges
+   before Sep 16 regardless, because mainnet gets the corrected hook. What is actually being
+   decided is only whether Arc *testnet* runs the corrected hook at submission:
+   - **(a) Redeploy before Sep 12:** merge, re-mine the salt, deploy, initialise a fresh pool, run
+     one lifecycle. ~0.1 USDC of testnet gas and the deployer key. It is also a dry run of exactly
+     the artefact that goes to mainnet on Sep 16, and it gives the video the complete story — found
+     on chain by our own keeper, fixed, redeployed.
+   - **(b) Submit on the Sep 4 hook, documented;** merge and deploy the fix on Sep 16 with mainnet.
 
 1. **How much dashboard.** The honest floor is a page that lists positions and their state. Anything
    past that is presentation, and presentation is what gets cut first. *Settled by events: one

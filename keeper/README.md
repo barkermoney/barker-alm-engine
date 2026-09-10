@@ -144,5 +144,6 @@ custody claim, on chain, rather than in a comment.
 One honest note on the economics of that run: the position realised **+4.07%** against spot on a
 range topping out at +2.43%, which is impossible for a ladder alone. The excess is fee revenue — the
 dynamic fee hook charged the incoming swap **2.46%** rather than the base 0.30%, because it was the
-first swap in four days and the hook bills price drift without normalising for how long the drift
-took. That is a bug in our hook, not a windfall, and it is written up in `FEEDBACK.md` §16.
+hook billed that trader for the *previous* swap's 1,080-tick price impact — made four days earlier —
+at full rate, never having decayed it. That is a bug in our hook, not a windfall, and it is written
+up in `FEEDBACK.md` §16.

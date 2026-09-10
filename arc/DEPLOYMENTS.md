@@ -122,19 +122,27 @@ impossible for a ladder on its own. The `FeeApplied` event explains it:
 FeeApplied(fee = 24600, surge = 21600, tickMove = 1080)
 ```
 
-The dynamic fee hook charged **2.46%**. It was the first swap on this pool in four days, and the
-hook's surge term is `|ticks moved since the previous swap| × surgePerTick` — 1,080 × 20 = 21,600 —
-**with no normalisation for how long that movement took**. Stored surge decays over `decayBlocks`;
-the new contribution does not decay at all, because it is measured rather than remembered. Half the
-mechanism has a clock and the other half does not.
+The dynamic fee hook charged **2.46%**. The hook's surge term is `|ticks moved since the previous
+swap| × surgePerTick` — 1,080 × 20 = 21,600 — and those 1,080 ticks are **the Sep 4 swap's own price
+impact** (step 5 above: −368,460 → −367,380), billed to the next trader 588,318 blocks later. Nothing
+moved in between; a v4 pool's price only moves through its own swaps, and every one of them passes
+the hook. The hook dated the move to the block it *observed* it rather than the block it *happened*,
+so stored surge decayed and the move never did.
+
+*Corrected Sep 10.* The Sep 8 version of this paragraph called the 1,080 ticks "drift" over four days
+and the defect a missing normalisation for elapsed time. The event log shows two swaps and no drift;
+see [`../FEEDBACK.md`](../FEEDBACK.md) §16 for the retraction.
 
 So the +4.07% is not evidence the ladder works better than the math says. It is fee revenue the
 position charged because of a defect in our own hook, and on a real pool a 2.46% quote would simply
 have driven the trade elsewhere. The behaviour is pinned by `test_KNOWN_DEFECT_*` in
 [`test/BarkerDynamicFeeHook.t.sol`](test/BarkerDynamicFeeHook.t.sol), written up in
-[`../FEEDBACK.md`](../FEEDBACK.md) §16, and **not yet fixed** — a hook's permission bits live in its
-address, so a corrected hook is a new address, a new `PoolKey`, and the abandonment of the pool this
-document describes. That trade is a decision for Sep 10, not a reflex on Sep 8.
+[`../FEEDBACK.md`](../FEEDBACK.md) §16, and **not fixed in the deployed hook** — a hook's permission
+bits live in its address, so a corrected hook is a new address, a new `PoolKey`, and a new pool. The
+fix itself (date the move to `lastBlock` and decay it with the stored surge) is on branch
+[`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock),
+tested and undeployed; whether to redeploy before submission is decision 0 in
+[`../docs/schedule.md`](../docs/schedule.md).
 
 ### Also corrected today
 
