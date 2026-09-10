@@ -48,15 +48,42 @@ Minting a one-sided range above spot took only `token0` and zero `token1`; a swa
 
 Repo scaffolded, probe committed as documented pre-existing work. Then the first real build: a one-sided position manager over `PoolManager`, and a surge-fee hook. 35 tests, all green. Four new findings.
 
-#### 8. There is no way to read back what LP fee a swap actually paid
+#### 8. What LP fee did a swap actually pay? — *retracted and corrected Sep 10*
 
-This is the one we would most like fixed.
+> **What we originally wrote here, on Sep 4, and billed as "the one we would most like fixed":** that
+> a `beforeSwap` fee override "is not written to `slot0`, not included in the `Swap` event, and not
+> retrievable afterwards", that the `Swap` event's `fee` field is "the pool's stored fee, not the
+> override that was actually charged", and that every dynamic-fee pool on v4 is therefore
+> unobservable from outside.
 
-A `beforeSwap` hook can override the LP fee by returning `fee | OVERRIDE_FEE_FLAG`. That override applies to the swap and is then **gone** — it is not written to `slot0`, not included in the `Swap` event, and not retrievable afterwards by any getter we could find. `slot0.lpFee` continues to report the value from the last `updateDynamicLPFee`, which for an override-driven hook is a number no swap ever actually paid.
+**The middle claim is false, and our own indexer is what showed it.** On Sep 8 our hook overrode a
+swap's LP fee to 2.46%. The `Swap` event the PoolManager emitted for that swap —
+[`0x59d12358…`](https://testnet.arcscan.app/tx/0x59d12358cf619de41eb99659eb17f6a37bf382824d026217e3c164aa9d1e035c),
+block 61,111,138 — carries **`fee = 24600`**: the override, not the stored 3000. The source agrees:
+`Pool.swap` computes `swapFee` from `params.lpFeeOverride` when the override flag is set and from
+`slot0` only otherwise, and `PoolManager.swap` emits exactly that `swapFee`. Anyone indexing v4
+`Swap` events can answer "what did that swap cost?" for any dynamic-fee pool, with no help from the
+hook. We found this on Sep 10 while building the dashboard's fee log, which now reads the fee from
+the PoolManager's event rather than from ours.
 
-So there is no way for an integrator, an indexer, a block explorer, or a user to answer "what did that swap cost?" without the hook having had the foresight to emit its own event. We ended up emitting `FeeApplied` purely so our **own tests** could observe our own hook's behaviour — the assertion had nowhere else to read from.
+What remains true is narrow: the override is not persisted to `slot0`, so `slot0.lpFee` on an
+override-driven pool is a base rate rather than a price anyone paid — which is by design — and the
+`Swap` event's `fee` is the total swap fee, LP and protocol together, so the LP share has to be
+separated out when a protocol fee is switched on. Our hook's own `FeeApplied` event is still worth
+having, but for the *breakdown* (base, surge, the tick move that caused it), not because the fee is
+otherwise invisible.
 
-Concretely, the ask: **put the applied LP fee in the `Swap` event.** It already carries `fee`, but that is the pool's stored fee, not the override that was actually charged. Every dynamic-fee pool on v4 is currently unobservable from the outside, and every such hook is independently reinventing the same event to compensate. Analytics on dynamic-fee pools is not going to happen until this is fixed at the core.
+**How the error happened, since that is the useful part.** We wrote the entry from the Foundry test
+suite, where we had asserted against our hook's own event and never looked at the PoolManager's.
+The conclusion was drawn from where we had looked, not from where the data was. It then sat at the
+top of this file for six days, through two further sessions of work on the same hook, because
+nothing we built had any reason to read the `Swap` event's `fee` field — until something did.
+Same lesson as §13: the only reliable reviewer for a claim about on-chain data is a program that
+reads the on-chain data.
+
+**The DX point that survives:** the override documentation could say, next to `OVERRIDE_FEE_FLAG`,
+that the applied fee is reported in `Swap.fee`. We are hook authors who went looking for exactly
+that sentence and, not finding it, assumed the opposite.
 
 #### 9. Dynamic fees interact with exact-input accounting in a way the docs never state
 

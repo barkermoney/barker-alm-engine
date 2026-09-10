@@ -316,7 +316,9 @@ contract BarkerDynamicFeeHookTest is Base {
     // ------------------------------------------------------------ helpers
 
     /// @dev Runs a swap and returns the fee the hook applied, read back off its own event.
-    ///      The LP fee override is not persisted to `slot0`, so the event is the only witness.
+    ///      The PoolManager's `Swap` event carries the applied fee too (`fee` is the override when
+    ///      one is set — FEEDBACK.md §8, corrected Sep 10), but only ours carries the surge and the
+    ///      tick move that produced it, which is what these tests assert on.
     function _swapAndReadFee(bool zeroForOne, int256 amount, int24 limitTick)
         internal
         returns (uint24 fee, uint24 surge, int24 move)
