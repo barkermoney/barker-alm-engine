@@ -146,9 +146,9 @@ prize submission.
    earlier, at full rate (`FEEDBACK.md` §16 — the Sep 8 diagnosis of "drift without time
    normalisation" was wrong and has been retracted). **The fix is written, tested and pushed on
    branch [`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock)**
-   (Sep 10; a replay of the Sep 8 incident is its regression test) **and deliberately not merged or
-   deployed.** A hook's permission bits live in its address, so a corrected hook is a new address,
-   a new `PoolKey` and a new pool. The Sep 4 pool and both its lifecycles stay on chain and stay
+   (Sep 10; a replay of the Sep 8 incident is its regression test), left unmerged until decided.
+   A hook's permission bits live in its address, so a corrected hook is a new address, a new
+   `PoolKey` and a new pool. The Sep 4 pool and both its lifecycles stay on chain and stay
    verifiable either way — redeploying adds evidence, it does not erase any. The branch merges
    before Sep 16 regardless, because mainnet gets the corrected hook. What is actually being
    decided is only whether Arc *testnet* runs the corrected hook at submission:
@@ -157,6 +157,11 @@ prize submission.
      the artefact that goes to mainnet on Sep 16, and it gives the video the complete story — found
      on chain by our own keeper, fixed, redeployed.
    - **(b) Submit on the Sep 4 hook, documented;** merge and deploy the fix on Sep 16 with mainnet.
+
+   *Decided Sep 10 by the author: **(a)**. Done the same day* — hook
+   `0xFc50962B…5080`, a fresh pool, a full lifecycle, and the Sep 8 incident replayed on chain
+   (charged 0.30% where the old hook charged 2.46%), 0.041495 USDC. See
+   [`../arc/DEPLOYMENTS.md`](../arc/DEPLOYMENTS.md).
 
 1. **How much dashboard.** The honest floor is a page that lists positions and their state. Anything
    past that is presentation, and presentation is what gets cut first. *Settled by events: one

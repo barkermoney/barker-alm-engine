@@ -237,9 +237,10 @@ So the defect is narrower than we said, and the fix is different. The move happe
 `surge = decay(min(stored + |move| × surgePerTick, maxFee), block − lastBlock)`. That is a
 reordering, not a new mechanism. The re-baseline fix we proposed would have been worse: it charges
 a move in full one block before the window closes and nothing one block after. The corrected hook
-is on branch [`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock),
-with a replay of the Sep 8 incident on the deployed parameters as a regression test; it is **not
-deployed** — see [`docs/schedule.md`](docs/schedule.md), decision 0.
+was **redeployed on Sep 10** and the incident replayed on chain: the same 1,080-tick move, charged
+2.46% by the old hook 588,318 blocks later, was charged the base 0.30% by the new one 390 blocks
+later — `FeeApplied(3000, 0, 1080)` against `FeeApplied(24600, 21600, 1080)`. Addresses and
+transactions in [`arc/DEPLOYMENTS.md`](arc/DEPLOYMENTS.md); the same replay is a regression test.
 
 **How the error happened.** "The previous observation is four days old" slid into "the price
 drifted for four days" without our asking what could have moved the price in between. On a v4 pool

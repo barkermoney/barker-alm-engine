@@ -1,5 +1,10 @@
 # Deployments
 
+**Current hook: `0xFc50962B690B1d9eD1F7Af84c096892f027A5080` (Sep 10).** The Sep 4 hook below billed
+one trader for another trader's price impact; the corrected hook, its pool and a full lifecycle are
+[at the end of this file](#sep-10--the-corrected-hook-redeployed). The Sep 4 contracts, pool and
+transactions stay on chain and stay documented here, because they are how the defect was found.
+
 ## Arc Testnet (chain id `5042002`) — Sep 4, 2026
 
 Explorer: https://testnet.arcscan.app
@@ -9,7 +14,7 @@ Explorer: https://testnet.arcscan.app
 | Contract | Address | Deploy tx |
 |---|---|---|
 | `BarkerV4Positions` | [`0x8ba4bFeC9616f2569AAB75AeC7B7411AA7F2a4Bb`](https://testnet.arcscan.app/address/0x8ba4bFeC9616f2569AAB75AeC7B7411AA7F2a4Bb) | [`0xc0d085ec…`](https://testnet.arcscan.app/tx/0xc0d085ecb6949454ca42d9a372292f2e6a2c0040d259b5772037ae403553b380) |
-| `BarkerDynamicFeeHook` | [`0x31f6be09B9f63a26dfC894f9bBA7074047f59080`](https://testnet.arcscan.app/address/0x31f6be09B9f63a26dfC894f9bBA7074047f59080) | [`0xdca90503…`](https://testnet.arcscan.app/tx/0xdca905039fe46cb20c20664a12bc6ce5aa1e1193c0587aa7b2911141cd15e9de) |
+| `BarkerDynamicFeeHook` (Sep 4, superseded Sep 10) | [`0x31f6be09B9f63a26dfC894f9bBA7074047f59080`](https://testnet.arcscan.app/address/0x31f6be09B9f63a26dfC894f9bBA7074047f59080) | [`0xdca90503…`](https://testnet.arcscan.app/tx/0xdca905039fe46cb20c20664a12bc6ce5aa1e1193c0587aa7b2911141cd15e9de) |
 
 The hook was placed by CREATE2 (deployer `0x4e59b448…`, salt `0x5ab`) at an address whose low 14 bits
 are `0x1080` = `AFTER_INITIALIZE | BEFORE_SWAP`. The salt was found by
@@ -135,15 +140,11 @@ see [`../FEEDBACK.md`](../FEEDBACK.md) §16 for the retraction.
 
 So the +4.07% is not evidence the ladder works better than the math says. It is fee revenue the
 position charged because of a defect in our own hook, and on a real pool a 2.46% quote would simply
-have driven the trade elsewhere. On this branch the incident is replayed on the deployed parameters
-by `test_moveFromLongAgo_isNotCharged_sep8Replay` in
-[`test/BarkerDynamicFeeHook.t.sol`](test/BarkerDynamicFeeHook.t.sol); it is written up in
-[`../FEEDBACK.md`](../FEEDBACK.md) §16, and **not fixed in the deployed hook** — a hook's permission
-bits live in its address, so a corrected hook is a new address, a new `PoolKey`, and a new pool. The
-fix itself (date the move to `lastBlock` and decay it with the stored surge) is on branch
-[`fix/fee-hook-clock`](https://github.com/barkermoney/barker-alm-engine/tree/fix/fee-hook-clock),
-tested and undeployed; whether to redeploy before submission is decision 0 in
-[`../docs/schedule.md`](../docs/schedule.md).
+have driven the trade elsewhere. It is written up in [`../FEEDBACK.md`](../FEEDBACK.md) §16,
+replayed on the deployed parameters by `test_moveFromLongAgo_isNotCharged_sep8Replay` in
+[`test/BarkerDynamicFeeHook.t.sol`](test/BarkerDynamicFeeHook.t.sol), and **fixed and redeployed on
+Sep 10** — see the next section. A hook's permission bits live in its address, so the fix is a new
+hook, a new `PoolKey` and a new pool; this one is left exactly as it was.
 
 ### Also corrected today
 
@@ -156,3 +157,59 @@ computes `liquidity × (growthInside − growthInsideLast) / 2^128` and is asser
 
 **0.015448 USDC** for the six transactions of this run, on top of the 0.081341 spent on Sep 4 —
 0.012854 paid by the owner across five transactions, 0.002594 paid by the keeper for the close.
+
+---
+
+## Sep 10 — the corrected hook, redeployed
+
+The fix dates each swap's price impact to the block it happened in and decays it from there, together
+with the stored surge (`_surgeNow` in [`src/BarkerDynamicFeeHook.sol`](src/BarkerDynamicFeeHook.sol)).
+`BarkerV4Positions` is unchanged and reused — it takes a `PoolKey` per position and does not care which
+hook the pool has.
+
+| Contract | Address | Deploy tx |
+|---|---|---|
+| `BarkerDynamicFeeHook` (current) | [`0xFc50962B690B1d9eD1F7Af84c096892f027A5080`](https://testnet.arcscan.app/address/0xFc50962B690B1d9eD1F7Af84c096892f027A5080) | [`0x48610984…`](https://testnet.arcscan.app/tx/0x486109847d7ffc8ed94f219f1ad70d2320750239bbc7a16387f2acfaa93ae980) |
+
+CREATE2 via `0x4e59b448…`, salt `0xe2aa`, init code hash `0x5f73b9d8…5584`, all predicted by
+[`script/MineHookSalt.s.sol`](script/MineHookSalt.s.sol) before sending; flags `0x1080`. Constructor
+parameters identical to Sep 4 and read back from chain: `baseFee` 3000, `maxFee` 50000,
+`surgePerTick` 20, `decayBlocks` 300.
+
+Pool: `poolId` `0x460517340a79421f75300d5a129bf6ea06e343b4ed85be57144353222b3ba89d` — the same
+BPROBE/USDC pair, dynamic fee, tick spacing 60, initialised at the same tick as Sep 4.
+
+### The lifecycle, plus the Sep 8 incident replayed on chain
+
+The same parameters as the Sep 4 run, so every number can be laid against it — with one extra swap.
+After the crossing swap, **nothing traded for 390 blocks**, longer than the 300-block decay window.
+Then a one-token swap asked the question the Sep 4 hook got wrong on Sep 8.
+
+| # | Step | Tx | Result |
+|---|---|---|---|
+| 1 | `initialize` | [`0x6293e71c…`](https://testnet.arcscan.app/tx/0x6293e71ce7749ab9132ad646e35431c3626f7fe61ee3d7a89e4bc45e64d9e756) | Pool created at tick −368460. |
+| 2 | **`open`** | [`0x5170db91…`](https://testnet.arcscan.app/tx/0x5170db9154341325ed69a64a0ef83f56167244e174c2721b5b58b5b8ca0c6b54) | Position #3, range [−368100, −367500]. Debited **19,999.999999999964117400 BPROBE and zero USDC** — one `Transfer`, to the wei the same as Sep 4. |
+| 3 | **`swap`** | [`0x88b96e38…`](https://testnet.arcscan.app/tx/0x88b96e386f1d093f840b1aabcf169de75350dcfe3b8196371ff9e85d13e3764a) | 2.136892 USDC in, price driven through the range to −367380 — **the same 1,080-tick move** as Sep 4. `FeeApplied(fee=3000, surge=0, tickMove=0)`. |
+| 4 | **`swap`**, 390 blocks later | [`0xa1ea4d8c…`](https://testnet.arcscan.app/tx/0xa1ea4d8ca48f2f0ab93565c4c879d06662483d139284bb8b9253976aac9a1102) | 1 BPROBE sold back into the range. **`FeeApplied(fee=3000, surge=0, tickMove=1080)`** — see below. |
+| 5 | **`close`** | [`0x7b8c1a82…`](https://testnet.arcscan.app/tx/0x7b8c1a822412ad1ee86c01ae8b54d39251d0cd97e08250bfa4ed113279052a4b) | **2.136781 USDC** and the 0.999999999999999620 BPROBE step 4 put back, paid to the owner. |
+
+The hook deployment is the sixth transaction; the BPROBE and USDC allowances from Sep 4 were still in
+place, so no `approve` was needed.
+
+### Step 4, next to Sep 8
+
+| | Previous swap's move | Blocks since it | Fee charged |
+|---|---|---|---|
+| Sep 8, Sep 4 hook — [`0x59d12358…`](https://testnet.arcscan.app/tx/0x59d12358cf619de41eb99659eb17f6a37bf382824d026217e3c164aa9d1e035c) | 1,080 ticks | 588,318 | **2.46%** — `FeeApplied(24600, 21600, 1080)` |
+| Sep 10, corrected hook — [`0xa1ea4d8c…`](https://testnet.arcscan.app/tx/0xa1ea4d8ca48f2f0ab93565c4c879d06662483d139284bb8b9253976aac9a1102) | 1,080 ticks | 390 | **0.30%** — `FeeApplied(3000, 0, 1080)` |
+
+The hook still sees the move and still reports it; it no longer charges a trader for a move made
+after the window has closed. `quoteFee` read 3000 in the block before, matching what was charged.
+Within the window the same move is charged in proportion to how recent it is, and at full rate in
+the block it happened — pinned by `test_moveDecaysFromTheBlockItHappened` and
+`test_noCliffAtTheEndOfTheWindow`.
+
+### Cost
+
+**0.041495 USDC** for the six transactions (the hook deployment is half of it), paid by the owner.
+Running total on Arc testnet across Sep 4, 8 and 10: 0.138284 USDC.
