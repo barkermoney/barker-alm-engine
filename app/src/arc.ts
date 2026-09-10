@@ -11,7 +11,12 @@ export const ARC = {
   explorer: "https://testnet.arcscan.app",
   poolManager: "0x2756F3F7bFAf103F4c550f4d24CdCa82B093240A" as Address,
   positions: "0x8ba4bFeC9616f2569AAB75AeC7B7411AA7F2a4Bb" as Address,
-  hook: "0x31f6be09B9f63a26dfC894f9bBA7074047f59080" as Address,
+  /// Every hook we have deployed, oldest first. The Sep 4 hook's pool and its two lifecycles stay on
+  /// chain; the Sep 10 hook carries the fee-decay fix (FEEDBACK.md §16). The last entry is current.
+  hooks: [
+    "0x31f6be09B9f63a26dfC894f9bBA7074047f59080",
+    "0xFc50962B690B1d9eD1F7Af84c096892f027A5080",
+  ] as Address[],
   startBlock: 60522409n,
 } as const;
 
@@ -156,7 +161,7 @@ export class ArcFeed {
         await indexRange(
           this.client,
           this.log,
-          { poolManager: ARC.poolManager, positions: ARC.positions, hook: ARC.hook },
+          { poolManager: ARC.poolManager, positions: ARC.positions, hook: ARC.hooks },
           head,
           20_000n,
           () => this.syncing && this.emit(),
@@ -244,7 +249,7 @@ export class ArcFeed {
         poolId: id as Hex,
         token0: this.tokenOf(String(init?.args.currency0 ?? "0x")),
         token1: this.tokenOf(String(init?.args.currency1 ?? "0x")),
-        hooks: String(init?.args.hooks ?? ARC.hook) as Address,
+        hooks: String(init?.args.hooks ?? ARC.hooks[ARC.hooks.length - 1]) as Address,
         swaps: this.log.events.filter((e) => e.name === "Swap" && e.args.id === id).length,
         tick: live?.tick,
         lpFee: live?.lpFee,

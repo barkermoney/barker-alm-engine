@@ -5,7 +5,8 @@ import { serialiseArgs, type EventLog, type IndexedEvent } from "./events.js";
 export interface IndexTargets {
   poolManager: Address;
   positions: Address;
-  hook?: Address;
+  /// One hook, or several: a corrected hook is a new address, and the old one's history stays on chain.
+  hook?: Address | Address[];
 }
 
 /// Pull every log the system produces, in pages, into the store.

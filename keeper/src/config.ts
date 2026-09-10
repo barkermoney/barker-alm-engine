@@ -34,7 +34,9 @@ export const config = {
   /// unable to reproduce what we claim.
   poolManager: addr("POOL_MANAGER", "0x2756F3F7bFAf103F4c550f4d24CdCa82B093240A"),
   positions: addr("POSITIONS", "0x8ba4bFeC9616f2569AAB75AeC7B7411AA7F2a4Bb"),
-  hook: process.env.HOOK ? addr("HOOK") : undefined,
+  /// Comma-separated when there is more than one — a redeployed hook is a new address, and the
+  /// indexer should keep the old one's history.
+  hook: process.env.HOOK ? process.env.HOOK.split(",").map((h, i) => addr(`HOOK[${i}]`, h.trim() as Address)) : undefined,
 
   /// The block the position manager was deployed in. Indexing from genesis on a sub-second chain
   /// is 60 million blocks of nothing.

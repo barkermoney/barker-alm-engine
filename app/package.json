@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "snapshot": "cd ../keeper && HOOK=0x31f6be09B9f63a26dfC894f9bBA7074047f59080 npm run -s index && cp data/events-5042002.json ../app/public/events-5042002.json"
+    "snapshot": "cd ../keeper && HOOK=0x31f6be09B9f63a26dfC894f9bBA7074047f59080,0xFc50962B690B1d9eD1F7Af84c096892f027A5080 npm run -s index && cp data/events-5042002.json ../app/public/events-5042002.json"
   },
   "dependencies": {
     "viem": "^2.21.0"
