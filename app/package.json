@@ -1,0 +1,22 @@
+{
+  "name": "@barker/alm-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One screen over both legs of the Barker ALM Engine: live Arc testnet positions and the yield-backed SwapVM maker",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "snapshot": "cd ../keeper && HOOK=0x31f6be09B9f63a26dfC894f9bBA7074047f59080 npm run -s index && cp data/events-5042002.json ../app/public/events-5042002.json"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

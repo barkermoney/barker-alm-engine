@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Barker ALM Engine</title>
+    <meta name="description" content="Yield-backed automated liquidity: one-sided Uniswap v4 ladders on Arc, and a 1inch SwapVM maker whose capital earns in an ERC-4626 vault while it quotes." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐕</text></svg>" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap top-inner">
+        <div>
+          <h1>Barker ALM Engine</h1>
+          <p class="thesis">Idle backing capital should earn while it backs quotes — and a liquidity range beats a limit order when the pool pays fees.</p>
+        </div>
+        <div class="chips"><span id="arc-chip"></span><span id="eth-chip"></span></div>
+      </div>
+    </header>
+
+    <main class="wrap grid">
+      <section class="leg arc">
+        <div class="leg-head">
+          <span class="venue">Arc testnet · Uniswap v4</span>
+          <h2>Take-profit ladders, closed by a keeper that cannot steal</h2>
+          <p>Funded one-sided above spot, a range sells into strength across its span and earns the pool fee while it does. When it has fully converted, the keeper closes it — and <code>close</code> can only ever pay the position's owner.</p>
+        </div>
+        <div class="kpis" id="arc-kpis"></div>
+        <div id="arc-pool"></div>
+        <div id="arc-positions" class="positions"></div>
+        <h3>Every swap on the pool · fee charged, and why</h3>
+        <div id="arc-fees"></div>
+        <p class="updated" id="arc-updated"></p>
+      </section>
+
+      <section class="leg aqua">
+        <div class="leg-head">
+          <span class="venue">Ethereum mainnet · 1inch SwapVM</span>
+          <h2>A maker whose capital earns while it quotes</h2>
+          <p>The maker's USDC sits in steakUSDC. A solvency guard caps every quote at what the vault can actually redeem, and settlement hooks redeem on fill and re-deposit on receipt, inside the swap. Return = vault APY + spread.</p>
+        </div>
+        <div class="kpis" id="aqua-kpis"></div>
+
+        <h3>What the guard does to a quote</h3>
+        <div class="controls">
+          <label>Maker's backing in the vault <output id="backing-v"></output>
+            <input id="backing" type="range" min="50000" max="2000000" step="50000" value="500000" />
+          </label>
+          <label>Trade size <output id="size-v"></output>
+            <input id="size" type="range" min="0" max="1000000" step="5000" value="100000" />
+          </label>
+        </div>
+        <div class="legend">
+          <span class="lg unguarded">No guard · priced against 10M virtual reserves</span>
+          <span class="lg sep5">Guard, Sep 5 · capped one reserve, broke the price</span>
+          <span class="lg guarded">Guard, now · caps depth, keeps the price</span>
+        </div>
+        <div id="depth-chart" class="chart"></div>
+        <div id="depth-readout"></div>
+
+        <h3>One recorded run, end to end</h3>
+        <div id="trace"></div>
+      </section>
+    </main>
+
+    <footer class="wrap foot">
+      <span>Built for ETHOnline 2026 · Continuity track · <a href="https://github.com/barkermoney/barker-alm-engine" target="_blank" rel="noopener">github.com/barkermoney/barker-alm-engine</a></span>
+      <span>Powered by SwapVM — © Degensoft Ltd 2025</span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
