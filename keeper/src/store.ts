@@ -1,5 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { compareEvents, eventKey, type EventLog, type IndexedEvent } from "./events.js";
+
+export { serialiseArgs, type IndexedEvent } from "./events.js";
 
 /// An append-only event log with a cursor, on disk as one JSON file.
 ///
@@ -16,15 +19,6 @@ import { join } from "node:path";
 /// The failure mode being designed out is not "the file is corrupt". It is "the numbers are
 /// plausible and wrong".
 
-export interface IndexedEvent {
-  blockNumber: string;
-  logIndex: number;
-  txHash: string;
-  source: "poolManager" | "positions" | "hook";
-  name: string;
-  args: Record<string, string | number | boolean>;
-}
-
 interface Snapshot {
   version: 1;
   chainId: number;
@@ -33,9 +27,7 @@ interface Snapshot {
   events: IndexedEvent[];
 }
 
-const eventKey = (e: IndexedEvent) => `${e.blockNumber}:${e.logIndex}`;
-
-export class Store {
+export class Store implements EventLog {
   private snapshot: Snapshot;
   private readonly path: string;
   private readonly seen: Set<string>;
@@ -77,11 +69,7 @@ export class Store {
       added++;
     }
     if (added > 0) {
-      this.snapshot.events.sort((a, b) => {
-        const d = BigInt(a.blockNumber) - BigInt(b.blockNumber);
-        if (d !== 0n) return d < 0n ? -1 : 1;
-        return a.logIndex - b.logIndex;
-      });
+      this.snapshot.events.sort(compareEvents);
     }
     // Never move the cursor backwards: re-running with an older `--from` must not un-index work.
     if (newCursor > this.cursor) this.snapshot.cursor = newCursor.toString();
@@ -98,17 +86,4 @@ export class Store {
   byName(name: string): IndexedEvent[] {
     return this.snapshot.events.filter((e) => e.name === name);
   }
-}
-
-/// JSON cannot hold a bigint, and `JSON.stringify` throws rather than guessing. Everything wide
-/// becomes a decimal string; everything that fits in a double stays a number so the dashboard can
-/// sort on it without parsing.
-export function serialiseArgs(args: Record<string, unknown>): Record<string, string | number | boolean> {
-  const out: Record<string, string | number | boolean> = {};
-  for (const [k, v] of Object.entries(args)) {
-    if (typeof v === "bigint") out[k] = v.toString();
-    else if (typeof v === "number" || typeof v === "boolean" || typeof v === "string") out[k] = v;
-    else if (v !== undefined && v !== null) out[k] = String(v);
-  }
-  return out;
 }

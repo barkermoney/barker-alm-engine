@@ -1,6 +1,6 @@
 import type { Address, PublicClient } from "viem";
 import { hookEvents, poolManagerEvents, positionsEvents } from "./abi.js";
-import { Store, serialiseArgs, type IndexedEvent } from "./store.js";
+import { serialiseArgs, type EventLog, type IndexedEvent } from "./events.js";
 
 export interface IndexTargets {
   poolManager: Address;
@@ -18,7 +18,7 @@ export interface IndexTargets {
 /// v3, and it is the thing most likely to bite someone porting one over.
 export async function indexRange(
   client: PublicClient,
-  store: Store,
+  store: EventLog,
   targets: IndexTargets,
   toBlock: bigint,
   pageSize: bigint,
@@ -101,7 +101,7 @@ export interface PoolSummary {
   lastTick?: number;
 }
 
-export function summarisePools(store: Store): PoolSummary[] {
+export function summarisePools(store: Pick<EventLog, "events">): PoolSummary[] {
   const pools = new Map<string, PoolSummary>();
 
   const get = (id: string): PoolSummary => {
@@ -158,7 +158,7 @@ export interface PositionSummary {
 
 /// The position registry, rebuilt from events alone. This is what makes the dashboard cheap: it
 /// never walks the registry mapping, it replays the log.
-export function summarisePositions(store: Store): PositionSummary[] {
+export function summarisePositions(store: Pick<EventLog, "events">): PositionSummary[] {
   const byId = new Map<string, PositionSummary>();
 
   for (const e of store.events) {
