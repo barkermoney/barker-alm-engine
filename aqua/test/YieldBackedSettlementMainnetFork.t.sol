@@ -103,16 +103,20 @@ contract YieldBackedSettlementMainnetForkTest is Test {
     /// @param usdcOut true for the USDT→USDC direction (redeem-on-fill), false for USDC→USDT
     ///   (redeposit-on-receive)
     function _order(bool usdcOut) internal view returns (ISwapVM.Order memory) {
+        return _order(usdcOut, true);
+    }
+
+    /// @param guarded false drops the solvency guard from the program — the strategy a maker would
+    ///   ship without it, used only to show what that strategy would have promised
+    function _order(bool usdcOut, bool guarded) internal view returns (ISwapVM.Order memory) {
         // The guard's vault argument only matters on the USDC-out side; paying out USDT the maker
         // quotes against loose inventory, which the guard reads with no vault attached.
-        bytes memory program = bytes.concat(
-            StaticBalances.build(RESERVE, RESERVE),
-            usdcOut
+        bytes memory guard_ = !guarded
+            ? bytes("")
+            : usdcOut
                 ? Extruction.build(address(guard), abi.encodePacked(STEAK_USDC))
-                : Extruction.build(address(guard), ""),
-            XYCSwap.build(),
-            Salt.build(1)
-        );
+                : Extruction.build(address(guard), "");
+        bytes memory program = bytes.concat(StaticBalances.build(RESERVE, RESERVE), guard_, XYCSwap.build(), Salt.build(1));
 
         return MakerTraitsLib.build(
             MakerTraitsLib.Args({
@@ -265,6 +269,116 @@ contract YieldBackedSettlementMainnetForkTest is Test {
         // Net position change = inflow − outflow, up to one unit of vault rounding per leg.
         uint256 expected = BACKING - usdcOutAmount + usdcInAmount;
         assertApproxEqAbs(vault.maxWithdraw(maker), expected, 4, "the vault absorbed the net flow");
+    }
+
+    // ---------------------------------------------------------------------
+    // dashboard trace
+    // ---------------------------------------------------------------------
+
+    /// @notice The whole story in five steps, recorded for the dashboard: what an unguarded
+    ///   strategy would promise, what the guarded one quotes, a fill paid out of the vault, a fill
+    ///   paid into it, and a month of yield widening depth with nobody touching the strategy.
+    /// @dev Asserts the same invariants as the tests above, so the trace cannot drift into
+    ///   something the suite does not also prove. Writes `app/public/aqua-fork-trace.json` only
+    ///   when `RECORD_TRACE=true`, so an ordinary run never rewrites a committed file:
+    ///
+    ///     RECORD_TRACE=true ETHEREUM_RPC_URL=… forge test --match-test test_recordDashboardTrace
+    function test_recordDashboardTrace() public onlyForked {
+        uint256 bigAsk = 1_000_000e6; // twice the backing
+        uint256 fill = 10_000e6;
+        // The USDT side is backed by loose inventory: this demo pairs one yield-bearing side with
+        // one plain side, which is also the realistic first deployment.
+        deal(USDT, maker, 500_000e6);
+        deal(USDT, taker, fill);
+        deal(USDC, taker, fill);
+        vm.startPrank(taker);
+        SafeUsdt.approve(USDT, address(router), type(uint256).max);
+        IERC20(USDC).approve(address(router), fill);
+        vm.stopPrank();
+
+        string memory steps = _step(
+            "deposit",
+            "Maker puts 500,000 USDC into steakUSDC and keeps none of it loose. The USDT side is 500,000 USDT of plain inventory.",
+            0,
+            0
+        );
+
+        // 1. The same strategy, quoted with and without the guard, for twice the backing.
+        (, uint256 unguarded,) = router.quote(_order(true, false), bigAsk, _signedTakerData(_order(true, false), true));
+        (, uint256 guarded,) = router.quote(_order(true), bigAsk, _signedTakerData(_order(true), true));
+        assertGt(unguarded, vault.maxWithdraw(maker), "unguarded promises more than the vault holds");
+        assertLe(guarded, vault.maxWithdraw(maker), "guarded never does");
+        steps = string.concat(
+            steps,
+            ",",
+            _step("quote", "Taker asks to sell 1,000,000 USDT for USDC: twice what backs the maker.", bigAsk, guarded)
+        );
+        string memory quoteNote = string.concat(
+            "\"unguardedQuote\":\"", vm.toString(unguarded), "\",\"guardedQuote\":\"", vm.toString(guarded), "\""
+        );
+
+        // 2. Redeem-on-fill: a real fill, paid out of steakUSDC inside the swap.
+        (, uint256 out1) = _swap(true, fill);
+        assertEq(IERC20(USDC).balanceOf(maker), 0, "nothing left idle after the payout");
+        steps = string.concat(
+            steps,
+            ",",
+            _step("fill-out", "Taker sells 10,000 USDT. The USDC payout is redeemed from steakUSDC inside the swap.", fill, out1)
+        );
+
+        // 3. Redeposit-on-receive: the taker's USDC is in the vault before the transaction ends.
+        (, uint256 out2) = _swap(false, fill);
+        assertEq(IERC20(USDC).balanceOf(maker), 0, "inbound USDC went straight to the vault");
+        steps = string.concat(
+            steps,
+            ",",
+            _step("fill-in", "Taker sells 10,000 USDC back. It is deposited into steakUSDC in the same transaction.", fill, out2)
+        );
+
+        // 4. Time passes; the vault accrues; quotable depth follows without a strategy change.
+        uint256 before = vault.maxWithdraw(maker);
+        vm.warp(block.timestamp + 30 days);
+        assertGe(vault.maxWithdraw(maker), before, "a lending vault should not lose value over time");
+        (, uint256 guardedLater,) = router.quote(_order(true), bigAsk, _signedTakerData(_order(true), true));
+        steps = string.concat(
+            steps,
+            ",",
+            _step("accrue", "30 days pass. The position earns steakUSDC yield and quotable depth widens with it.", bigAsk, guardedLater)
+        );
+
+        string memory json = string.concat(
+            "{\"recordedAtBlock\":", vm.toString(block.number),
+            ",\"chainId\":1,\"vault\":\"", vm.toString(STEAK_USDC),
+            "\",\"virtualReserve\":\"", vm.toString(RESERVE),
+            "\",\"backing\":\"", vm.toString(BACKING),
+            "\",", quoteNote,
+            ",\"steps\":[", steps, "]}"
+        );
+
+        if (vm.envOr("RECORD_TRACE", false)) {
+            vm.writeFile("../app/public/aqua-fork-trace.json", json);
+        }
+    }
+
+    /// @dev One step of the trace, with the maker's balances read at the moment it is recorded.
+    function _step(string memory id, string memory text, uint256 amountIn, uint256 amountOut)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            "{\"id\":\"", id,
+            "\",\"text\":\"", text,
+            "\",\"block\":", vm.toString(block.number),
+            ",\"timestamp\":", vm.toString(block.timestamp),
+            ",\"amountIn\":\"", vm.toString(amountIn),
+            "\",\"amountOut\":\"", vm.toString(amountOut),
+            "\",\"makerWalletUsdc\":\"", vm.toString(IERC20(USDC).balanceOf(maker)),
+            "\",\"makerWalletUsdt\":\"", vm.toString(IERC20(USDT).balanceOf(maker)),
+            "\",\"makerVaultUsdc\":\"", vm.toString(vault.maxWithdraw(maker)),
+            "\",\"makerShares\":\"", vm.toString(IERC20(STEAK_USDC).balanceOf(maker)),
+            "\"}"
+        );
     }
 }
 
