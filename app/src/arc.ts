@@ -133,7 +133,13 @@ export class ArcFeed {
   private lastUpdate?: number;
 
   constructor(private onChange: (s: ArcState) => void) {
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(ARC.rpc, { retryCount: 2 }) }) as PublicClient;
+    // `batch`: each refresh fires its reads in parallel, and Arc's public node answers sequential
+    // requests fine but rate-limits parallel bursts (429). Calls made in the same tick go out as
+    // one JSON-RPC batch request instead.
+    this.client = createPublicClient({
+      chain: arcTestnet,
+      transport: http(ARC.rpc, { retryCount: 2, batch: true }),
+    }) as PublicClient;
   }
 
   /// Seed from the committed snapshot so the page is useful before a single RPC call returns.
