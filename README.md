@@ -21,13 +21,14 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Arc leg | deployed to Arc testnet; **three full lifecycles** verified on chain — the second **closed unattended by the keeper**, the third run on the corrected fee hook and replaying the incident the keeper found ([tx list](arc/DEPLOYMENTS.md)). Mainnet: deployment-ready, deploying when Arc mainnet opens on Sep 16 |
 | Aqua leg | solvency guard and settlement running through an unmodified `SwapVMRouter` on an Ethereum mainnet fork against live steakUSDC ([details](aqua/README.md)) |
 | Automation | [`keeper/`](keeper/) — v4 event indexer and unattended keeper; closed Arc testnet position #2 on its own, Sep 8 |
-| Dashboard | [`app/`](app/) — one screen over both legs: live Arc testnet positions and fees, live steakUSDC, the guard's effect on a quote, and a recorded fork run |
+| Dashboard | **[barkermoney.github.io/barker-alm-engine](https://barkermoney.github.io/barker-alm-engine/)** — one screen over both legs: live Arc testnet positions and fees, live steakUSDC, the guard's effect on a quote, and a recorded fork run. Source in [`app/`](app/) |
 | Tests | 43 (`arc/`) · 45 (`aqua/`, incl. 11 on a mainnet fork) · 15 (`keeper/`) — all green |
 
 ## Try it
 
 ```bash
-# Dashboard — reads Arc testnet and Ethereum mainnet from the browser; no wallet, no backend
+# Dashboard — live at https://barkermoney.github.io/barker-alm-engine/, or locally.
+# Reads Arc testnet and Ethereum mainnet from the browser; no wallet, no backend
 cd app && npm install && npm run dev
 
 # Arc leg — v4 hook and position manager against a real PoolManager
