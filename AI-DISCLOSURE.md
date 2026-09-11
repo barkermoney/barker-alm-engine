@@ -31,15 +31,22 @@ would be here.
 | `app/**` | **Substantially AI-drafted, Sep 10**, in the same scheduled session, against the brief in [`docs/schedule.md`](docs/schedule.md) (D6: both legs visible, legible to a judge in ten seconds, a fifth of the score). Layout, wording and the choice to reuse the keeper's indexer in the browser are the assistant's; the page reads chain data and a recorded fork trace and holds no keys. Pending the author's review. |
 | `aqua/test/*.sol`, `aqua/test/mocks/*.sol` | **Substantially AI-drafted.** The mainnet-fork findings — the canonical deployment's ABI drift, `AquaOpcodes` lacking `StaticBalances` — came out of tests failing against the real chain and being investigated, not from generated commentary. |
 | `README.md`, `FEEDBACK.md`, `FEEDBACK-1INCH.md`, `aqua/README.md`, `keeper/README.md`, `app/README.md`, `arc/DEPLOYMENTS.md`, `docs/*`, this file | **AI-drafted prose, author's content.** Every finding in both feedback files is something actually hit during this build. |
+| `README.md` sponsor sections, `FEEDBACK.md` summary — Sep 11 | **AI-drafted** in a scheduled assistant session without the author present, from the findings already in the feedback files and `arc/DEPLOYMENTS.md`. Line references were read off the committed sources. Pending the author's review. |
 | `research/arc-probe/**` | Pre-hackathon probe, AI-assisted at the time it was written (Aug 31 – Sep 2). Committed unmodified; see its README. |
 | Strategy design, venue selection, licensing analysis, product decisions | **Human.** Decided before and outside the AI loop. |
-| Key handling, transaction signing, deployment decisions | **Human.** See below. |
+| Deployment and transaction decisions | **Human.** The author decided every deployment and every on-chain run. |
+| Sending testnet transactions | **Partly AI.** A number of the Arc testnet transactions were sent by the assistant from the author's session. See below. |
 
 ## What AI did not do
 
 - It did not choose the strategy, the venues, or the product.
-- It did not hold keys or decide to broadcast. Every transaction that moves funds is authorised by
-  the author; the assistant produces the script and the author runs it.
+- It did not decide to broadcast. Every transaction was sent only after the author decided it
+  should be. *Corrected Sep 11:* an earlier version of this line said the assistant never held keys
+  and that the author ran every script. That was not accurate. Several Arc testnet transactions —
+  deployments and lifecycle steps — were sent by the assistant itself, from the author's session,
+  with the testnet deployer key the author supplied; and the Sep 8 keeper ran on a fresh key the
+  assistant generated for that run, deliberately separate from the owner's. No mainnet key has been
+  used, and no key is stored in this repository.
 - It did not write the part of this system that constitutes the actual insight — the ladder
   mechanics and their parameters — which are proprietary and, as the README states, not in this
   repository at all.
