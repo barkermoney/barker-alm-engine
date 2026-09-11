@@ -50,8 +50,8 @@ becomes a much cheaper choice about how much dashboard to build.
 | **D4 — Sep 7** | Aqua end to end on the fork, with the liquidity buffer ratio. **Check-in #1 before 20:59.** | **done Sep 7** — both directions against live steakUSDC on a mainnet fork incl. a round trip, buffer ratio in settlement, 4 fork tests; suite total 40 green. Check-in #1 submitted. |
 | **D5 — Sep 8** | Keeper loop (the piece deferred from D3) and the v4 event indexer — `Initialize` / `Swap` / `ModifyLiquidity`. | **done Sep 8** — position #2 closed unattended on Arc testnet by a keeper on its own key ([`keeper/`](../keeper/), 15 tests); indexer rebuilds both positions and 19 pools from events; two real bugs found and one fixed |
 | **D6 — Sep 9** | Multi-position dashboard over the indexer, both legs visible. | **done Sep 10**, a day late (no build session ran on Sep 9) — [`app/`](../app/): live Arc positions and fees through the keeper's own indexer, live steakUSDC, the guard's effect on a quote, a recorded fork run. Building it surfaced two real errors, below |
-| **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | Whatever is behind gets this day |
-| **D8 — Sep 11** | README, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, video script and rehearsal. | Everything written except the recording |
+| **D7 — Sep 10** | Buffer, and the custom SwapVM opcode variant if the time is genuinely there. **Check-in #2 before 20:59.** | **done Sep 10** — the buffer went to the fee hook: diagnosis corrected, fixed, redeployed, and the Sep 8 incident replayed on chain. Check-in #2 submitted. Custom opcode not attempted |
+| **D8 — Sep 11** | README, three per-sponsor integration write-ups, `FEEDBACK.md` closed out, video script and rehearsal. | **done Sep 11** — the README carries one section per sponsor (Uniswap with contract line references, Arc with the bounty named and an architecture diagram, 1inch); `FEEDBACK.md` summary written; video script drafted outside the repo. Rehearsal is the author's |
 | **D9 — Sep 12** | Record the demo video. Submit on the dashboard. | Submitted — **not** left for the morning of the 13th |
 
 Two full days of buffer at the end. For a solo run that is the right shape; the failure mode of a
@@ -169,7 +169,7 @@ prize submission.
 2. **Whether to attempt the custom SwapVM opcode variant.** 1inch explicitly permits redeploying a
    modified SwapVM, and doing so is a differentiator rather than a requirement — the official
    extension points (`Extruction`, `IMakerHooks`) already satisfy the brief. Attempt it only if D7
-   is genuinely free.
+   is genuinely free. *Not attempted: D7 went to the fee hook.*
 3. **Only if Aqua has slipped badly:** the original cut still stands as the fallback.
 
 The Arc leg is never the thing that gets cut. It carries two of the three prize submissions and the
