@@ -257,6 +257,62 @@ could say so in one sentence — and add the corollary that bit us: the move you
 
 ## Summary for the Uniswap Foundation
 
-*(to be filled in before submission — condensed version of the above, plus the answer to "what would have saved us the most time")*
+*Written Sep 11, after the build. Sixteen entries above; three of them (§8, §13, §16) are our own
+claims, retracted in public, and the retractions are left in because they carry the most useful
+lesson in this file.*
 
-This document is also submitted, by link, through the [Uniswap Developer Feedback Form](https://developers.uniswap.org/hackathon-feedback).
+### What worked, and should be said louder
+
+- **The no-periphery path is excellent** (§4). A ~90-line helper, and later a 347-line position
+  manager, drove the full lifecycle straight against `PoolManager` — `unlock`, `modifyLiquidity`,
+  `sync` / `settle` / `take`. For a team that wants to own its accounting this is a far better story
+  than v3's, and it deserves to be documented as a supported path rather than discovered.
+- **The math is exact** (§7, §9, §13). A fully crossed one-sided range realised +0.3008% over its
+  geometric mean against a clean-formula +0.3009%. v4 is precise enough that a five-basis-point
+  discrepancy is always the integrator's bug — which is a strength, once you know to believe it.
+- **Hooks are a genuinely good extension surface** (§16). A `BEFORE_SWAP` hook sees the price move
+  by exactly one swap between two of its calls, so volatility measured there is exact, not
+  sampled. That is a property worth advertising.
+
+### What would have saved us the most time
+
+**Reading pool state off chain** (§12, §14). `StateLibrary.getSlot0` reads like a method on the
+PoolManager and is not one; `cast call … getSlot0` returns a bare `execution reverted`, and every
+indexer, dashboard and shell script then reimplements the storage layout — `pools` at slot 6, the
+packed `slot0` word, a sign-extended `int24` that yields a tick of ~16 million when wrong. We wrote
+it twice. A read-only getter contract or a versioned, published storage layout would remove the
+single most common off-chain task from the list of things integrators get wrong.
+
+### The rest, ranked by what we would fix first
+
+1. **A `feesOwed` helper in `StateLibrary`** (§15). `getFeeGrowthInside` returns a Q128
+   accumulator that type-checks as "fees" and differs from the real number by ~2^128. Everyone needs
+   `liquidity × (inside − insideLast) / 2^128`; everyone derives it from the same two calls.
+2. **A first-party "what did this position realise" reader** (§13). Two of our three retractions
+   came from numbers read by hand or asserted against our own events instead of the PoolManager's.
+   Nearly-right numbers survive review; a canonical reader would have caught both.
+3. **Hook deployment tooling in core** (§3, §10). `HookMiner` is pure address arithmetic but lives
+   in periphery, so the no-periphery path has to hand-roll salt mining. We also recommend a pattern
+   we saw in no example — assert your own address flags in the constructor — which turns a mis-mined
+   salt from a silently-never-called hook into a failed deployment.
+4. **Fail loudly on dynamic-fee misconfiguration** (§5). A dynamic-fee sentinel without the matching
+   hook permission yields a static-fee pool with no revert.
+5. **Two sentences in the dynamic-fee docs** (§8, §16): the applied override is reported in
+   `Swap.fee`; and the move a `beforeSwap` hook measures belongs to the *previous* swap, so it should
+   be dated to that swap's block. We went looking for the first sentence, did not find it, and
+   assumed the opposite; the absence of the second cost a trader 2.46% on our testnet pool.
+6. **An on-chain version identifier on `PoolManager`** (§2). Deployed managers track `v4-core`
+   HEAD, tags disagree with them, and the mismatch surfaces only as runtime decode failures.
+7. **Smaller papercuts** — a typed exact-in / exact-out wrapper for `amountSpecified`'s inverted sign
+   (§1); presenting `sqrtPriceLimitX96` as the safety rail it is (§6); a worked fee-versus-price
+   example for exact-input swaps (§9); attaching `StateLibrary` to `PoolManager` as well as
+   `IPoolManager` (§11).
+
+### The meta lesson
+
+Every error we made on the v4 leg was found by a program reading on-chain data, and none by
+reading our own tests. The indexer and dashboard were built as features; they turned out to be the
+best reviewer on the project. If there is one thing the v4 ecosystem could ship that would help
+every hook author, it is making that program cheap to write.
+
+This document is also submitted, by link, through the [Uniswap Developer Feedback Form](https://developers.uniswap.org/hackathon-feedback) (Sep 10).
