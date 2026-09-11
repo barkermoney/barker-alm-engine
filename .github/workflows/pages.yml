@@ -9,6 +9,11 @@ on:
       - "app/**"
       - "keeper/src/**"
       - ".github/workflows/pages.yml"
+  # Hourly rebuild with a fresh event snapshot. The page catches up from the snapshot's cursor to
+  # the chain head in the visitor's browser; Arc makes ~7k blocks an hour, so an hourly snapshot
+  # keeps that to a single getLogs page instead of a burst the public node rate-limits.
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,6 +37,14 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
         working-directory: app
+      # Refresh the seed snapshot with the keeper's own indexer, starting from the committed one.
+      # Not committed back; if the RPC is unavailable the committed snapshot ships instead.
+      - name: Refresh event snapshot
+        continue-on-error: true
+        run: |
+          (cd keeper && npm ci)
+          mkdir -p keeper/data && cp app/public/events-5042002.json keeper/data/
+          (cd app && npm run -s snapshot)
       - run: npm run typecheck && npm run build
         working-directory: app
       - uses: actions/upload-pages-artifact@v3
