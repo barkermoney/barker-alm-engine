@@ -40,7 +40,8 @@ function renderArc(s: ArcState): void {
     kpi(String(open), "open now", open ? "watched live below" : "nothing at risk right now"),
   ].join("");
 
-  const pool = s.pools[0];
+  // The pool the newest position lives in — i.e. the current hook's pool, not the first ever made.
+  const pool = s.positions[0]?.pool ?? s.pools[0];
   $("#arc-pool").innerHTML = pool
     ? `<div class="pool">
         <div class="pool-pair">${esc(pool.token0.symbol)} / ${esc(pool.token1.symbol)}</div>
@@ -278,8 +279,9 @@ async function main(): Promise<void> {
   renderTrace(trace);
 
   const loopArc = async () => {
-    await arc.refresh();
-    setTimeout(loopArc, 5_000);
+    // Back off when the public node pushes back (it rate-limits bursts of getLogs).
+    const ok = await arc.refresh();
+    setTimeout(loopArc, ok ? 5_000 : 20_000);
   };
   const loopAqua = async () => {
     await aqua.refresh();

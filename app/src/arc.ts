@@ -151,7 +151,15 @@ export class ArcFeed {
   }
 
   /// One pass: catch the log up to head, then read live pool state for the pools we care about.
-  async refresh(): Promise<void> {
+  /// Returns false if any part failed, so the caller can back off from a rate-limiting node.
+  ///
+  /// The two halves fail independently. Catch-up is many `getLogs` pages and is what a public
+  /// node rate-limits; the live reads are a handful of calls. A page that cannot finish catching
+  /// up should still show the pool's tick and who closed each position — both are already
+  /// answerable from the snapshot plus a few reads — and catch-up resumes from its committed
+  /// cursor on the next pass.
+  async refresh(): Promise<boolean> {
+    const errors: string[] = [];
     try {
       const head = await this.client.getBlockNumber();
       this.head = head;
@@ -168,20 +176,25 @@ export class ArcFeed {
         );
         this.syncing = false;
       }
+    } catch (err) {
+      this.syncing = false;
+      errors.push(firstLine(err));
+    }
 
+    try {
       const positions = summarisePositions(this.log);
       const poolIds = [...new Set(positions.map((p) => p.poolId as Hex))];
       await Promise.all(poolIds.map((id) => this.readPool(id)));
       await Promise.all(positions.filter((p) => !p.closed).map((p) => this.readFees(p.positionId)));
       await Promise.all(positions.filter((p) => p.closeTx).map((p) => this.readSender(p.closeTx!)));
-
-      this.error = undefined;
-      this.lastUpdate = Date.now();
     } catch (err) {
-      this.syncing = false;
-      this.error = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      errors.push(firstLine(err));
     }
+
+    this.error = errors[0];
+    if (!errors.length) this.lastUpdate = Date.now();
     this.emit();
+    return !errors.length;
   }
 
   private async readPool(poolId: Hex): Promise<void> {
@@ -323,6 +336,10 @@ export class ArcFeed {
   private emit(): void {
     this.onChange(this.state());
   }
+}
+
+function firstLine(err: unknown): string {
+  return err instanceof Error ? (err.message.split("\n")[0] ?? err.message) : String(err);
 }
 
 export function short(a: string): string {
