@@ -12,7 +12,7 @@ Solo, 9 real days. All times **PT** (the author's local timezone, so event times
 | **Sep 13, 09:00** | **Submissions due** | 12:00 EDT. The real deadline — Sep 16 is only the finale. Late submissions are not accepted. |
 | Sep 14, 09:00 | Live judging (top ~20% only) | 7 minutes: **4 minutes demo + 3 minutes Q&A**, live, English. Round 1 has no bearing on partner prizes — most prize money goes to projects that never advance. |
 | Sep 16, 09:00 | Finale | Arc mainnet goes live the same day |
-| Sep 30 | Arc mainnet deployment deadline | For the Arc "push to mainnet" bounty |
+| Sep 30 | Arc mainnet deployment deadline | Part of the Arc Continuity prize is paid only for a mainnet deployment by this date |
 
 The effective window is **Sep 4 → Sep 13, 09:00** — nine days, not twelve. Everything below is planned backwards from that submission deadline, which is the one date with no recovery from missing it.
 
@@ -126,6 +126,12 @@ deployment-ready** on Arc mainnet by September 30", so being deployment-ready at
 satisfies it; and the submission form states plainly that *"you can still update your project after
 submitting."* The route is therefore: deploy on Sep 16, update the README and the project entry.
 
+*Superseded Sep 12.* Arc has since restructured its prizes (see the prize table at the end): the
+"deployment-ready" wording is gone, and part of the Continuity prize is now paid **only** for an
+actual Arc mainnet deployment by September 30. The route is unchanged — deploy on Sep 16, update the
+README and the project entry — but the Sep 16 deployment is now required, not a bonus. The
+restructure also leaves a single Arc Continuity track, so the second question below is moot.
+
 **"Can one Continuity project be considered for both Arc sub-bounties at once?"** Yes. The official
 rules: *"If a partner has multiple tracks, you can be eligible for all of them while only counting
 as 1 Partner Prize."* Both Arc tracks we target are Continuity-marked, and together they consume one
@@ -185,14 +191,14 @@ decision date is to stop the last two days from being spent deciding instead of 
 |---|---|
 | Sep 14 | Live judging, if we place in the top 20% |
 | **Sep 16** | Arc mainnet is live — deploy, execute one real transaction, add the verified tx and addresses to this README and to the ETHGlobal showcase page |
-| Sep 30 | Hard deadline for the Arc mainnet requirement |
+| Sep 30 | Hard deadline for the Arc mainnet deployment — without it, the mainnet portion of the Arc prize is not paid |
 
 ## Prize submissions (max 3 per project)
 
 | Sponsor | Track | What it needs from us |
 |---|---|---|
 | **1inch** | "Build an Aqua App" — Continuity ($1,500 / $500) | Official Aqua/SwapVM contracts **required**, though redeploying a *modified* SwapVM is explicitly allowed. On-chain token transfer shown in the demo — **local forks are acceptable**. Modified opcodes and custom instructions are explicitly invited, not merely tolerated. Proper commit history, no single-commit final day. |
-| **Arc (Circle)** | Primary: "Launch on Arc Testnet & Push to Mainnet" — Continuity ($1,000 / $500). Also qualifies for "Best DeFi or Agentic Application" — Continuity ($1,666) | Functional MVP **and an architecture diagram**, a video demo covering effective use of Circle tools, and a repo link. Mainnet requirement is **"deployed or deployment-ready by September 30"** — so submitting on the 13th, before Arc mainnet exists on the 16th, is anticipated by the rules. The submission must state explicitly which bounty is targeted. |
+| **Arc (Circle)** | "Best DeFi or Agentic Application" — Continuity ($3,000, of which $2,000 is awarded only if the same project is deployed to Arc mainnet by September 30). *Restructured after Sep 8: the earlier "Launch on Arc Testnet & Push to Mainnet" tracks, and their "deployed or deployment-ready" wording, no longer exist.* | Functional MVP — a working **frontend and backend** — **plus an architecture diagram**, a video demo covering effective use of Circle tools, and a repo link. Submitting on the 13th with testnet deployments is fine; the mainnet deployment follows on Sep 16. The submission names the bounty targeted. |
 | **Uniswap Foundation** | "Best Uniswap Stack Contribution" — Continuity ($1,000 × 2) | Three things, all mandatory: a public repo with open-source code, **`FEEDBACK.md`**, and a completed [Developer Feedback Form](https://developers.uniswap.org/hackathon-feedback). Plus: the README must point clearly at the relevant contracts **and lines of code**. No chain restriction; new v4 hooks are explicitly welcomed. |
 
 Each sponsor gets its own integration write-up and its own feedback. Multiple sub-bounties from one sponsor consume only one of the three slots.

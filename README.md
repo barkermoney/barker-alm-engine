@@ -18,7 +18,7 @@ Built for **ETHOnline 2026** on the **Continuity Track** by [Barker](https://bar
 | Event | ETHOnline 2026 (Sep 4 – Sep 16, 2026) |
 | Track | Continuity — hacking on an existing project |
 | Team | solo |
-| Arc leg | deployed to Arc testnet; **three full lifecycles** verified on chain — the second **closed unattended by the keeper**, the third run on the corrected fee hook and replaying the incident the keeper found ([tx list](arc/DEPLOYMENTS.md)). Mainnet: deployment-ready, deploying when Arc mainnet opens on Sep 16 |
+| Arc leg | deployed to Arc testnet; **three full lifecycles** verified on chain — the second **closed unattended by the keeper**, the third run on the corrected fee hook and replaying the incident the keeper found ([tx list](arc/DEPLOYMENTS.md)). Mainnet: deploying with the same scripts when Arc mainnet opens on Sep 16 |
 | Aqua leg | solvency guard and settlement running through an unmodified `SwapVMRouter` on an Ethereum mainnet fork against live steakUSDC ([details](aqua/README.md)) |
 | Automation | [`keeper/`](keeper/) — v4 event indexer and unattended keeper; closed Arc testnet position #2 on its own, Sep 8 |
 | Dashboard | **[barkermoney.github.io/barker-alm-engine](https://barkermoney.github.io/barker-alm-engine/)** — one screen over both legs: live Arc testnet positions and fees, live steakUSDC, the guard's effect on a quote, and a recorded fork run. Source in [`app/`](app/) |
@@ -77,9 +77,9 @@ v4 is not a bolt-on here — the one-sided range *is* the product primitive. Mea
 
 **Feedback.** [`FEEDBACK.md`](FEEDBACK.md) — 16 entries written as the build happened, including three public retractions, with a summary at the end. Also submitted through the Uniswap Developer Feedback Form on Sep 10.
 
-### Arc (Circle) — Launch on Arc Testnet & Push to Mainnet
+### Arc (Circle) — Best DeFi or Agentic Application
 
-**Bounty targeted:** primarily **"Launch on Arc Testnet & Push to Mainnet"** (Continuity). The same project also meets **"Best DeFi or Agentic Application"** (Continuity): an automated market-making engine whose keeper acts on chain without a human in the loop.
+**Bounty targeted:** **"Best DeFi or Agentic Application"** — Arc's Continuity Track prize, including the portion paid only for a deployment to Arc mainnet by Sep 30 (see *Mainnet* below). The project is an automated market-making engine whose keeper acts on chain without a human in the loop. Frontend: the [dashboard](https://barkermoney.github.io/barker-alm-engine/) ([`app/`](app/)); backend: the indexer and keeper ([`keeper/`](keeper/)); architecture diagram below.
 
 **What we built on Arc.** An automated liquidity manager for a USDC-native chain. Every pool is quoted in USDC, every position converts into USDC, and every transaction — deployments, lifecycles, the keeper's own close — pays gas in USDC. The keeper runs on its own funded key and closes a ladder the moment it has fully converted; the position manager guarantees the USDC lands in the owner's wallet, not the keeper's. Circle technology used: **Arc** (testnet, chain `5042002`) and **USDC** as gas token, quote asset and settlement unit, funded from Circle's faucet. The Uniswap v4 `PoolManager` we build on is the one live on Arc testnet.
 
@@ -123,7 +123,7 @@ The full system, including the Aqua leg and the private strategy boundary, is in
 | Sep 8 incident replayed on the corrected hook, Sep 10 | [`0xa1ea4d8c…`](https://testnet.arcscan.app/tx/0xa1ea4d8ca48f2f0ab93565c4c879d06662483d139284bb8b9253976aac9a1102) — 0.30% where the old hook charged 2.46% |
 | Total spent on Arc testnet | 0.138284 USDC across 20 transactions, three of them contract deployments |
 
-**Mainnet.** Arc mainnet opens on Sep 16, after the submission deadline; the brief asks for a project "deployed or deployment-ready" by Sep 30. The same scripts that produced every testnet deployment above ([`arc/script/`](arc/script/)) deploy to mainnet by changing the RPC. The mainnet addresses and a verified transaction will be added here and to the project page when it is live.
+**Mainnet.** Arc mainnet opens on Sep 16, three days after the submission deadline; part of this bounty is awarded only if the same project is deployed to Arc mainnet by Sep 30. We deploy on Sep 16. The same scripts that produced every testnet deployment above ([`arc/script/`](arc/script/)) deploy to mainnet by changing the RPC. The mainnet addresses and a verified transaction will be added here and to the project page when it is live.
 
 ### 1inch — Build an Aqua App
 
